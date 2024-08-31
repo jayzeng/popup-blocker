@@ -1,26 +1,29 @@
 {
-  "manifest_version": 2,
-  "name": "Simple Adblocker",
+  "manifest_version": 3,
+  "name": "Simple Popup Blocker",
   "version": "1.0",
-  "description": "A simple adblocker with per-site activation",
+  "description": "A simple popup blocker with per-site activation",
   "permissions": [
     "activeTab",
     "storage",
-    "webRequest",
-    "webRequestBlocking",
+    "tabs",
+    "webNavigation",
+    "management"
+  ],
+  "host_permissions": [
     "<all_urls>"
   ],
   "background": {
-    "scripts": ["background.js"],
-    "persistent": true
+    "service_worker": "background.js"
   },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content.js"]
+      "js": ["content.js"],
+      "run_at": "document_start"
     }
   ],
-  "browser_action": {
+  "action": {
     "default_popup": "popup.html"
   },
   "icons": {
@@ -28,5 +31,6 @@
     "32": "images/favicon-32x32.png",
     "48": "images/favicon-32x32.png",
     "128": "images/mstile-150x150.png"
-  }
+  },
+  "incognito": "split"
 }

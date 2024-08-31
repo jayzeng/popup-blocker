@@ -10,7 +10,8 @@
     "rootDir": "./src",
     "jsx": "react",
     "sourceMap": true,
-    "typeRoots": ["./node_modules/@types", "./src/types"]
+    "typeRoots": ["./node_modules/@types", "./src/types"],
+    "lib": ["dom", "es6", "es2017"]
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "**/*.spec.ts"]

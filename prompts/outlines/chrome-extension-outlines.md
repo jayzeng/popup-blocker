@@ -30,7 +30,7 @@
     │   └── types/
     │       └── index.ts
     ├── public/
-    │   ���── manifest.json
+    │   ├── manifest.json
     │   └── images/
     │       ├── icon-16.png
     │       ├── icon-32.png
@@ -52,12 +52,14 @@
     export interface BlockedSite {
       hostname: string;
       isBlocked: boolean;
+      blockedCount: number;
     }
 
     export enum MessageType {
       TOGGLE_BLOCKING = 'TOGGLE_BLOCKING',
       GET_BLOCKING_STATUS = 'GET_BLOCKING_STATUS',
       UPDATE_BLOCKING_STATUS = 'UPDATE_BLOCKING_STATUS',
+      INCREMENT_BLOCKED_COUNT = 'INCREMENT_BLOCKED_COUNT',
     }
 
     export interface MessagePayload {
@@ -77,37 +79,88 @@
     const blockedSites: BlockedSite[] = [];
 
     chrome.runtime.onInstalled.addListener(() => {
-      console.log('Adblocker extension installed');
+      console.log('Popup blocker extension installed');
     });
 
     chrome.runtime.onMessage.addListener((message: MessagePayload, sender, sendResponse) => {
       if (message.type === MessageType.TOGGLE_BLOCKING) {
         const { hostname } = message.data as { hostname: string };
-        const siteIndex = blockedSites.findIndex(site => site.hostname === hostname);
+        let site = blockedSites.find(site => site.hostname === hostname);
         
-        if (siteIndex === -1) {
-          blockedSites.push({ hostname, isBlocked: true });
+        if (!site) {
+          site = { hostname, isBlocked: true, blockedCount: 0 };
+          blockedSites.push(site);
         } else {
-          blockedSites[siteIndex].isBlocked = !blockedSites[siteIndex].isBlocked;
+          site.isBlocked = !site.isBlocked;
         }
         
-        sendResponse({ isBlocked: blockedSites[siteIndex]?.isBlocked || false });
+        // Send message to content script
+        chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
+          if (tabs[0]?.id) {
+            chrome.tabs.sendMessage(tabs[0].id, {
+              type: MessageType.UPDATE_BLOCKING_STATUS,
+              data: { isBlocked: site.isBlocked }
+            });
+          }
+        });
+        
+        sendResponse({ isBlocked: site.isBlocked, blockedCount: site.blockedCount });
       } else if (message.type === MessageType.GET_BLOCKING_STATUS) {
         const { hostname } = message.data as { hostname: string };
         const site = blockedSites.find(site => site.hostname === hostname);
-        sendResponse({ isBlocked: site?.isBlocked || false });
+        sendResponse({ isBlocked: site?.isBlocked || false, blockedCount: site?.blockedCount || 0 });
+      } else if (message.type === MessageType.INCREMENT_BLOCKED_COUNT) {
+        const { hostname } = message.data as { hostname: string };
+        const site = blockedSites.find(site => site.hostname === hostname);
+        if (site) {
+          site.blockedCount++;
+          sendResponse({ blockedCount: site.blockedCount });
+        } else {
+          sendResponse({ blockedCount: 0 });
+        }
       }
+      return true; // Indicates that the response is sent asynchronously
     });
 
-    chrome.webRequest.onBeforeRequest.addListener(
-      (details) => {
-        const url = new URL(details.url);
-        const site = blockedSites.find(site => site.hostname === url.hostname);
-        return { cancel: site?.isBlocked || false };
-      },
-      { urls: ["<all_urls>"] },
-      ["blocking"]
-    );
+    // Listen for new tab or window creation
+    chrome.webNavigation.onCreatedNavigationTarget.addListener((details) => {
+      chrome.tabs.get(details.sourceTabId, (sourceTab) => {
+        if (sourceTab && sourceTab.url) {
+          const sourceUrl = new URL(sourceTab.url);
+          const site = blockedSites.find(site => site.hostname === sourceUrl.hostname);
+          if (site?.isBlocked) {
+            chrome.tabs.remove(details.tabId);
+            site.blockedCount++;
+            // Notify the popup if it's open
+            chrome.runtime.sendMessage({
+              type: MessageType.UPDATE_BLOCKING_STATUS,
+              data: { isBlocked: true, blockedCount: site.blockedCount }
+            });
+          }
+        }
+      });
+    });
+
+    // Listen for window creation (for popup windows)
+    chrome.windows.onCreated.addListener((window) => {
+      if (window.type === 'popup') {
+        chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
+          if (tabs[0] && tabs[0].url) {
+            const url = new URL(tabs[0].url);
+            const site = blockedSites.find(site => site.hostname === url.hostname);
+            if (site?.isBlocked && window.id) {
+              chrome.windows.remove(window.id);
+              site.blockedCount++;
+              // Notify the popup if it's open
+              chrome.runtime.sendMessage({
+                type: MessageType.UPDATE_BLOCKING_STATUS,
+                data: { isBlocked: true, blockedCount: site.blockedCount }
+              });
+            }
+          }
+        });
+      }
+    });
     ```
 
 - [ ] **Content Script Development**
@@ -145,6 +198,43 @@
         }
       }
     });
+
+    // Override window.open to block popups
+    const originalWindowOpen = window.open;
+    window.open = function (url, target, features) {
+      if (target === '_blank') {
+        chrome.runtime.sendMessage<MessagePayload>({
+          type: MessageType.INCREMENT_BLOCKED_COUNT,
+          data: { hostname: window.location.hostname }
+        });
+        return null;
+      }
+      return originalWindowOpen.call(window, url, target, features);
+    };
+
+    // Block form submissions that target new windows
+    document.addEventListener('submit', (event) => {
+      const form = event.target as HTMLFormElement;
+      if (form.target === '_blank') {
+        event.preventDefault();
+        chrome.runtime.sendMessage<MessagePayload>({
+          type: MessageType.INCREMENT_BLOCKED_COUNT,
+          data: { hostname: window.location.hostname }
+        });
+      }
+    });
+
+    // Block clicks on links that would open in new tabs
+    document.addEventListener('click', (event) => {
+      const target = event.target as HTMLElement;
+      if (target.tagName === 'A' && target.target === '_blank') {
+        event.preventDefault();
+        chrome.runtime.sendMessage<MessagePayload>({
+          type: MessageType.INCREMENT_BLOCKED_COUNT,
+          data: { hostname: window.location.hostname }
+        });
+      }
+    });
     ```
 
 - [ ] **Popup Development**
@@ -159,6 +249,7 @@
     const Popup: React.FC = () => {
       const [isBlocked, setIsBlocked] = useState<boolean>(false);
       const [hostname, setHostname] = useState<string>('');
+      const [blockedCount, setBlockedCount] = useState<number>(0);
 
       useEffect(() => {
         chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -170,6 +261,7 @@
             data: { hostname: url.hostname }
           }, (response) => {
             setIsBlocked(response.isBlocked);
+            setBlockedCount(response.blockedCount);
           });
         });
       }, []);
@@ -180,6 +272,7 @@
           data: { hostname }
         }, (response) => {
           setIsBlocked(response.isBlocked);
+          setBlockedCount(response.blockedCount);
           chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
             chrome.tabs.sendMessage(tabs[0].id!, {
               type: MessageType.UPDATE_BLOCKING_STATUS,
@@ -193,6 +286,7 @@
         <div>
           <h1>Adblocker</h1>
           <p>Current site: {hostname}</p>
+          <p>Blocked popups: {blockedCount}</p>
           <button onClick={toggleBlocking}>
             {isBlocked ? 'Deactivate' : 'Activate'} Adblocker
           </button>
