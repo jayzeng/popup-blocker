@@ -7,7 +7,6 @@ const Popup: React.FC = () => {
   const [hostname, setHostname] = useState<string>('');
   const [isBlocked, setIsBlocked] = useState<boolean>(false);
   const [blockedCount, setBlockedCount] = useState<number>(0);
-  const [isCovered, setIsCovered] = useState<boolean>(false);
 
   useEffect(() => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -20,7 +19,6 @@ const Popup: React.FC = () => {
           (response) => {
             setIsBlocked(response.isBlocked);
             setBlockedCount(response.blockedCount);
-            setIsCovered(response.isCovered);
           }
         );
       }
@@ -40,8 +38,8 @@ const Popup: React.FC = () => {
   return (
     <div className="popup-container">
       <h1 className="title">Popup Blocker</h1>
-      <div id="coverageStatus" className={`coverage-status ${isCovered ? 'covered' : 'not-covered'}`}>
-        {isCovered ? 'This site is covered by the extension' : 'This site is not covered by the extension'}
+      <div id="coverageStatus" className={`coverage-status ${isBlocked ? 'covered' : 'not-covered'}`}>
+        {isBlocked ? 'This site is covered by the extension' : 'This site is not covered by the extension'}
       </div>
       <div className="info-container">
         <div className="info-item">
