@@ -36,5 +36,5 @@ jobs:
         git config user.email github-actions@github.com
         TAG_NAME="build-$(date +'%Y%m%d-%H%M%S')"
         git tag $TAG_NAME
-        git push https://${GITHUB_ACTOR}:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git $TAG_NAME
-      shell: /usr/bin/bash -e {0}
+        git push origin $TAG_NAME
+      shell: bash -e {0}
