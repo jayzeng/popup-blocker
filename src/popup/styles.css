@@ -83,3 +83,38 @@ body {
   background-color: #fff2e6;
   color: #ff6600;
 }
+
+.blocked-sites-list {
+  margin-top: 20px;
+}
+
+.blocked-sites-list h2 {
+  font-size: 18px;
+  margin-bottom: 10px;
+}
+
+.blocked-sites-list ul {
+  list-style-type: none;
+  padding: 0;
+}
+
+.blocked-sites-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.blocked-sites-list button {
+  background-color: #e74c3c;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.blocked-sites-list button:hover {
+  background-color: #c0392b;
+}

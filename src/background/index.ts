@@ -1,12 +1,10 @@
 import { MessageType, MessagePayload, BlockedSite } from '../types';
+import { StorageKeys } from '../types';
 
 const blockedSites: BlockedSite[] = [];
-const coveredSites: string[] = []; // Add this line to store covered sites
 
 chrome.runtime.onInstalled.addListener(() => {
   console.log('Popup blocker extension installed');
-  // Replace this with your actual list of covered sites
-  updateCoveredSites(['example.com', 'google.com', 'github.com']);
 });
 
 chrome.runtime.onMessage.addListener((message: MessagePayload, sender, sendResponse) => {
@@ -19,6 +17,13 @@ chrome.runtime.onMessage.addListener((message: MessagePayload, sender, sendRespo
       blockedSites.push(site);
     } else {
       site.isBlocked = !site.isBlocked;
+      if (!site.isBlocked) {
+        // Remove the site from the list if it's unblocked
+        const index = blockedSites.findIndex(s => s.hostname === hostname);
+        if (index !== -1) {
+          blockedSites.splice(index, 1);
+        }
+      }
     }
     
     // Send message to content script
@@ -31,15 +36,18 @@ chrome.runtime.onMessage.addListener((message: MessagePayload, sender, sendRespo
       }
     });
     
-    sendResponse({ isBlocked: site.isBlocked, blockedCount: site.blockedCount });
+    saveBlockedSites();
+    sendResponse({ 
+      isBlocked: site.isBlocked, 
+      blockedCount: site.blockedCount,
+      blockedSites: blockedSites // Send the updated list of blocked sites
+    });
   } else if (message.type === MessageType.GET_BLOCKING_STATUS) {
     const { hostname } = message.data as { hostname: string };
     const site = blockedSites.find(site => site.hostname === hostname);
-    const isCovered = coveredSites.includes(hostname);
     sendResponse({ 
       isBlocked: site?.isBlocked || false, 
-      blockedCount: site?.blockedCount || 0,
-      isCovered // Add this line
+      blockedCount: site?.blockedCount || 0
     });
   } else if (message.type === MessageType.INCREMENT_BLOCKED_COUNT) {
     const { hostname } = message.data as { hostname: string };
@@ -55,12 +63,32 @@ chrome.runtime.onMessage.addListener((message: MessagePayload, sender, sendRespo
     } else {
       sendResponse({ blockedCount: 0 });
     }
-  } else if (message.type === MessageType.CHECK_COVERAGE) { // Add this block
+  } else if (message.type === MessageType.GET_BLOCKED_SITES) {
+    sendResponse(blockedSites);
+  } else if (message.type === MessageType.UNBLOCK_SITE) {
     const { hostname } = message.data as { hostname: string };
-    const isCovered = coveredSites.includes(hostname);
-    sendResponse({ isCovered });
+    const index = blockedSites.findIndex(site => site.hostname === hostname);
+    if (index !== -1) {
+      blockedSites.splice(index, 1);
+      saveBlockedSites();
+      sendResponse({ success: true });
+    } else {
+      sendResponse({ success: false });
+    }
   }
   return true; // Indicates that the response is sent asynchronously
+});
+
+// Function to save blocked sites to storage
+const saveBlockedSites = () => {
+  chrome.storage.local.set({ [StorageKeys.BLOCKED_SITES]: blockedSites });
+};
+
+// Load blocked sites from storage on startup
+chrome.storage.local.get([StorageKeys.BLOCKED_SITES], (result) => {
+  if (result[StorageKeys.BLOCKED_SITES]) {
+    blockedSites.push(...result[StorageKeys.BLOCKED_SITES]);
+  }
 });
 
 // Listen for new tab or window creation
@@ -102,9 +130,3 @@ chrome.windows.onCreated.addListener((window) => {
     });
   }
 });
-
-// Add this function to update covered sites (you'll need to call this periodically or when your coverage list changes)
-function updateCoveredSites(sites: string[]) {
-  coveredSites.length = 0; // Clear the array
-  coveredSites.push(...sites);
-}

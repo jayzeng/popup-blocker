@@ -3,7 +3,9 @@ export enum MessageType {
   GET_BLOCKING_STATUS = 'GET_BLOCKING_STATUS',
   UPDATE_BLOCKING_STATUS = 'UPDATE_BLOCKING_STATUS',
   INCREMENT_BLOCKED_COUNT = 'INCREMENT_BLOCKED_COUNT',
-  CHECK_COVERAGE = 'CHECK_COVERAGE'
+  CHECK_COVERAGE = 'CHECK_COVERAGE',
+  GET_BLOCKED_SITES = 'GET_BLOCKED_SITES',
+  UNBLOCK_SITE = 'UNBLOCK_SITE'
 }
 
 export interface BlockedSite {
@@ -37,4 +39,14 @@ export interface IncrementBlockedCountPayload {
 
 export interface CheckCoveragePayload {
   hostname: string;
+}
+
+export enum StorageKeys {
+  BLOCKED_SITES = 'BLOCKED_SITES',
+}
+
+export interface ToggleBlockingResponse {
+  isBlocked: boolean;
+  blockedCount: number;
+  blockedSites: BlockedSite[];
 }
