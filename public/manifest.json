@@ -1,14 +1,15 @@
 {
   "manifest_version": 3,
-  "name": "Simple Popup Blocker",
+  "name": "Yet Another Popup Blocker",
   "version": "1.0",
-  "description": "A simple popup blocker with per-site activation",
+  "description": "A simple popup blocker with per-site activation and incognito mode support",
   "permissions": [
     "activeTab",
     "storage",
     "tabs",
     "webNavigation",
-    "management"
+    "management",
+    "windows"
   ],
   "host_permissions": [
     "<all_urls>"

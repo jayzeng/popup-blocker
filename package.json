@@ -1,7 +1,7 @@
 {
-  "name": "adblocker-chrome-extension",
+  "name": "yet-another-popup-blocker",
   "version": "1.0.0",
-  "description": "A simple adblocker Chrome extension with per-site activation",
+  "description": "A simple popup blocker Chrome extension with per-site activation and incognito mode support",
   "main": "index.js",
   "scripts": {
     "build": "webpack --config webpack.config.js",

@@ -4,16 +4,21 @@ import { StorageKeys } from '../types';
 const blockedSites: BlockedSite[] = [];
 
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('Popup blocker extension installed');
+  console.log('Yet Another Popup Blocker extension installed');
 });
 
 chrome.runtime.onMessage.addListener((message: MessagePayload, sender, sendResponse) => {
   if (message.type === MessageType.TOGGLE_BLOCKING) {
-    const { hostname } = message.data as { hostname: string };
+    const { hostname, isIncognito } = message.data as { hostname: string; isIncognito: boolean };
     let site = blockedSites.find(site => site.hostname === hostname);
     
     if (!site) {
-      site = { hostname, isBlocked: true, blockedCount: 0 };
+      site = { 
+        hostname, 
+        isBlocked: true, 
+        blockedCount: 0, 
+        isMasked: isIncognito // Set isMasked based on isIncognito
+      };
       blockedSites.push(site);
     } else {
       site.isBlocked = !site.isBlocked;

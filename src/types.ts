@@ -12,6 +12,7 @@ export interface BlockedSite {
   hostname: string;
   isBlocked: boolean;
   blockedCount: number;
+  isMasked: boolean; // Add this new property
 }
 
 export interface MessagePayload {

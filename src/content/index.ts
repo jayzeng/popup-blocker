@@ -97,7 +97,7 @@ chrome.runtime.onMessage.addListener((message: MessagePayload, sender, sendRespo
 function checkInitialBlockingStatus() {
   chrome.runtime.sendMessage<MessagePayload>({
     type: MessageType.GET_BLOCKING_STATUS,
-    data: { hostname: window.location.hostname }
+    data: { hostname: globalThis.location.hostname }
   }, (response) => {
     if (chrome.runtime.lastError) {
       console.error('Error getting initial blocking status:', chrome.runtime.lastError);
@@ -106,6 +106,14 @@ function checkInitialBlockingStatus() {
     if (response && typeof response.isBlocked === 'boolean') {
       isBlocked = response.isBlocked;
       if (isBlocked) {
+        chrome.windows.getCurrent((window) => {
+          if (window.incognito) {
+            chrome.runtime.sendMessage({
+              type: MessageType.TOGGLE_BLOCKING,
+              data: { hostname: globalThis.location.hostname, isIncognito: true }
+            });
+          }
+        });
         blockPopups();
       }
     } else {

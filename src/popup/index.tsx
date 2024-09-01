@@ -8,12 +8,19 @@ const Popup: React.FC = () => {
   const [isBlocked, setIsBlocked] = useState<boolean>(false);
   const [blockedCount, setBlockedCount] = useState<number>(0);
   const [blockedSites, setBlockedSites] = useState<BlockedSite[]>([]);
+  const [isIncognito, setIsIncognito] = useState<boolean>(false);
+  const [unmaskedSites, setUnmaskedSites] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs[0]?.url) {
         const url = new URL(tabs[0].url);
         setHostname(url.hostname);
+
+        // Check if the current window is incognito
+        chrome.windows.get(tabs[0].windowId, (window) => {
+          setIsIncognito(window.incognito);
+        });
 
         chrome.runtime.sendMessage(
           { type: MessageType.GET_BLOCKING_STATUS, data: { hostname: url.hostname } } as MessagePayload,
@@ -33,7 +40,10 @@ const Popup: React.FC = () => {
 
   const handleToggleBlocking = () => {
     chrome.runtime.sendMessage(
-      { type: MessageType.TOGGLE_BLOCKING, data: { hostname } } as MessagePayload,
+      { 
+        type: MessageType.TOGGLE_BLOCKING, 
+        data: { hostname, isIncognito } 
+      } as MessagePayload,
       (response) => {
         setIsBlocked(response.isBlocked);
         setBlockedCount(response.blockedCount);
@@ -43,7 +53,12 @@ const Popup: React.FC = () => {
           // Add the site to the list if it's not already there
           setBlockedSites(prevSites => {
             if (!prevSites.some(site => site.hostname === hostname)) {
-              return [...prevSites, { hostname, isBlocked: true, blockedCount: response.blockedCount }];
+              return [...prevSites, { 
+                hostname, 
+                isBlocked: true, 
+                blockedCount: response.blockedCount,
+                isMasked: isIncognito // Set isMasked based on isIncognito
+              }];
             }
             return prevSites;
           });
@@ -66,9 +81,27 @@ const Popup: React.FC = () => {
     );
   };
 
+  // Function to mask the hostname
+  const maskHostname = (hostname: string) => {
+    return hostname.replace(/[^.]/g, '*');
+  };
+
+  // Function to toggle unmasking for a specific site
+  const toggleUnmask = (hostname: string) => {
+    setUnmaskedSites(prevUnmasked => {
+      const newUnmasked = new Set(prevUnmasked);
+      if (newUnmasked.has(hostname)) {
+        newUnmasked.delete(hostname);
+      } else {
+        newUnmasked.add(hostname);
+      }
+      return newUnmasked;
+    });
+  };
+
   return (
     <div className="popup-container">
-      <h1 className="title">Popup Blocker</h1>
+      <h1 className="title">Yet Another Popup Blocker</h1>
       <div id="coverageStatus" className={`coverage-status ${isBlocked ? 'covered' : 'not-covered'}`}>
         {isBlocked ? 'This site is covered by the extension' : 'This site is not covered by the extension'}
       </div>
@@ -96,7 +129,17 @@ const Popup: React.FC = () => {
           <ul>
             {blockedSites.map(site => (
               <li key={site.hostname}>
-                {site.hostname}
+                {site.isMasked && !unmaskedSites.has(site.hostname) 
+                  ? maskHostname(site.hostname) 
+                  : site.hostname}
+                {site.isMasked && (
+                  <button 
+                    onClick={() => toggleUnmask(site.hostname)}
+                    className="unmask-button"
+                  >
+                    {unmaskedSites.has(site.hostname) ? 'Mask' : 'Unmask'}
+                  </button>
+                )}
                 <button onClick={() => handleUnblockSite(site.hostname)}>Unblock</button>
               </li>
             ))}
