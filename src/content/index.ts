@@ -3,105 +3,116 @@ import { MessageType, MessagePayload } from '../types';
 console.log('Content script loaded');
 
 let isBlocked = false;
-let originalWindowOpen: typeof window.open | null = null;
 
-const blockPopups = () => {
-  // Store the original window.open function
-  originalWindowOpen = window.open;
-
-  // Override window.open
-  window.open = function(...args) {
-    console.log('Blocked window.open:', args);
-    chrome.runtime.sendMessage({
-      type: MessageType.INCREMENT_BLOCKED_COUNT,
-      data: { hostname: window.location.hostname }
-    });
-    return null;
-  };
-
-  // Block clicks that might open new windows
-  document.addEventListener('click', (e) => {
-    const target = e.target as HTMLElement;
-    if (target.tagName === 'A' && (
-      target.getAttribute('target') === '_blank' || 
-      target.getAttribute('href')?.startsWith('http://') ||
-      target.getAttribute('href')?.startsWith('https://')
-    )) {
-      e.preventDefault();
-      e.stopPropagation();
-      console.log('Blocked click:', target);
-      chrome.runtime.sendMessage({
-        type: MessageType.INCREMENT_BLOCKED_COUNT,
-        data: { hostname: window.location.hostname }
-      });
+function injectScript(file: string) {
+  try {
+    const script = document.createElement('script');
+    script.src = chrome.runtime.getURL(file);
+    script.onload = function() {
+      script.remove();
+    };
+    (document.head || document.documentElement).appendChild(script);
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error('Error injecting script:', error.message);
+    } else {
+      console.error('Unknown error injecting script');
     }
-  }, true);
-
-  // Block form submissions that might open new windows
-  document.addEventListener('submit', (e) => {
-    const form = e.target as HTMLFormElement;
-    if (form.getAttribute('target') === '_blank') {
-      e.preventDefault();
-      e.stopPropagation();
-      chrome.runtime.sendMessage({
-        type: MessageType.INCREMENT_BLOCKED_COUNT,
-        data: { hostname: window.location.hostname }
-      });
-    }
-  }, true);
-};
-
-// Add this new function to inject a script into the page
-function injectScript(func: () => void) {
-  const script = document.createElement('script');
-  script.textContent = `(${func.toString()})();`;
-  (document.head || document.documentElement).appendChild(script);
-  script.remove();
+  }
 }
 
-// Inject a script to override window.open in the page context
-injectScript(() => {
-  const originalWindowOpen = window.open;
-  window.open = function(...args) {
-    console.log('Intercepted window.open:', args);
-    window.postMessage({ type: 'BLOCKED_POPUP', args }, '*');
-    return null;
-  };
-});
+function blockPopups() {
+  injectScript('block_popups.js');
 
-// Listen for blocked popup messages from the injected script
+  document.addEventListener('click', handleClick, true);
+  document.addEventListener('submit', handleSubmit, true);
+}
+
+function unblockPopups() {
+  injectScript('unblock_popups.js'); // Create this file to restore window.open
+
+  document.removeEventListener('click', handleClick, true);
+  document.removeEventListener('submit', handleSubmit, true);
+}
+
+function handleClick(e: MouseEvent) {
+  const target = e.target as HTMLElement;
+  if (target.tagName === 'A' && (
+    target.getAttribute('target') === '_blank' || 
+    target.getAttribute('href')?.startsWith('http://') ||
+    target.getAttribute('href')?.startsWith('https://')
+  )) {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('Blocked click:', target);
+    incrementBlockedCount();
+  }
+}
+
+function handleSubmit(e: SubmitEvent) {
+  const form = e.target as HTMLFormElement;
+  if (form.getAttribute('target') === '_blank') {
+    e.preventDefault();
+    e.stopPropagation();
+    incrementBlockedCount();
+  }
+}
+
+function incrementBlockedCount() {
+  chrome.runtime.sendMessage({
+    type: MessageType.INCREMENT_BLOCKED_COUNT,
+    data: { hostname: window.location.hostname }
+  }, (response) => {
+    if (chrome.runtime.lastError) {
+      console.error('Error sending INCREMENT_BLOCKED_COUNT message:', chrome.runtime.lastError);
+    }
+  });
+}
+
 window.addEventListener('message', (event) => {
   if (event.source === window && event.data && event.data.type === 'BLOCKED_POPUP') {
     console.log('Received blocked popup message:', event.data);
-    chrome.runtime.sendMessage({
-      type: MessageType.INCREMENT_BLOCKED_COUNT,
-      data: { hostname: window.location.hostname }
-    });
+    incrementBlockedCount();
   }
 });
 
 chrome.runtime.onMessage.addListener((message: MessagePayload, sender, sendResponse) => {
   console.log('Message received in content script:', message);
-  if (message.type === MessageType.UPDATE_BLOCKING_STATUS) {
-    isBlocked = (message.data as { isBlocked: boolean }).isBlocked;
-    if (isBlocked) {
-      blockPopups();
-    } else if (originalWindowOpen) {
-      // Restore original window.open function
-      window.open = originalWindowOpen;
-      // Reload the page to remove event listeners
-      window.location.reload();
+  try {
+    if (message.type === MessageType.UPDATE_BLOCKING_STATUS) {
+      isBlocked = (message.data as { isBlocked: boolean }).isBlocked;
+      if (isBlocked) {
+        blockPopups();
+      } else {
+        unblockPopups();
+      }
     }
+    sendResponse({ success: true });
+  } catch (error: unknown) {
+    console.error('Error handling message:', error instanceof Error ? error.message : 'Unknown error');
+    sendResponse({ success: false, error: error instanceof Error ? error.message : 'Unknown error' });
   }
 });
 
-// Check initial blocking status
-chrome.runtime.sendMessage<MessagePayload>({
-  type: MessageType.GET_BLOCKING_STATUS,
-  data: { hostname: window.location.hostname }
-}, (response) => {
-  isBlocked = response.isBlocked;
-  if (isBlocked) {
-    blockPopups();
-  }
-});
+function checkInitialBlockingStatus() {
+  chrome.runtime.sendMessage<MessagePayload>({
+    type: MessageType.GET_BLOCKING_STATUS,
+    data: { hostname: window.location.hostname }
+  }, (response) => {
+    if (chrome.runtime.lastError) {
+      console.error('Error getting initial blocking status:', chrome.runtime.lastError);
+      return;
+    }
+    if (response && typeof response.isBlocked === 'boolean') {
+      isBlocked = response.isBlocked;
+      if (isBlocked) {
+        blockPopups();
+      }
+    } else {
+      console.error('Invalid response for initial blocking status:', response);
+    }
+  });
+}
+
+// Run the initial check
+checkInitialBlockingStatus();
