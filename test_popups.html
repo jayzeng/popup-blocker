@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Popup Test</title>
+</head>
+<body>
+    <h1>Popup Test</h1>
+    <button onclick="window.open('https://example.com')">Normal window.open</button>
+    <button onclick="window._f = {}; window._f.open = window.open; window._f.open('https://example.com')">Nested open</button>
+    <button onclick="Object.defineProperty(window, 'myOpen', { value: window.open }); window.myOpen('https://example.com')">Define Property</button>
+    <button onclick="window.location.href = 'https://example.com'">Location redirect</button>
+    
+    <script src="block_popups.js"></script>
+    <script>
+        // Additional test cases
+        setTimeout(() => {
+            console.log("Attempting delayed popup");
+            window.open('https://example.com');
+        }, 2000);
+
+        (function() {
+            const w = window;
+            w.open('https://example.com');
+        })();
+    </script>
+</body>
+</html>

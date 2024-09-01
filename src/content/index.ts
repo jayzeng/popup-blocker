@@ -70,9 +70,23 @@ function incrementBlockedCount() {
 }
 
 window.addEventListener('message', (event) => {
-  if (event.source === window && event.data && event.data.type === 'BLOCKED_POPUP') {
-    console.log('Received blocked popup message:', event.data);
-    incrementBlockedCount();
+  if (event.source === window && event.data) {
+    switch (event.data.type) {
+      case 'BLOCKED_POPUP':
+        console.log('Blocked popup:', event.data.args);
+        incrementBlockedCount();
+        break;
+      case 'BLOCKED_REDIRECT':
+        console.log('Blocked redirect:', event.data.url || event.data.method, event.data.args);
+        incrementBlockedCount();
+        break;
+      case 'INTERCEPTED_FOCUS':
+        console.log('Intercepted window focus');
+        break;
+      case 'INTERCEPTED_BLUR':
+        console.log('Intercepted window blur');
+        break;
+    }
   }
 });
 

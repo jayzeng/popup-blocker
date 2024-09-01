@@ -2,7 +2,7 @@
 
 ## About
 
-This Chrome extension is yet another popup blocker with per-site activation. It allows users to block popups on specific websites and provides an easy-to-use interface for managing blocked sites. The extension also includes a feature to mask hostnames of sites blocked in incognito mode for enhanced privacy.
+This Chrome extension is yet another popup blocker with per-site activation. It allows users to block popups on specific websites and provides an easy-to-use interface for managing blocked sites. The extension also includes a feature to mask hostnames of sites blocked in incognito mode for enhanced privacy. Most popup blocker extensions available don't work well enough. 
 
 ## Features
 

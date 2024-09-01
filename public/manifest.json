@@ -37,7 +37,7 @@
     "16": "images/favicon-16x16.png",
     "32": "images/favicon-32x32.png",
     "48": "images/favicon-32x32.png",
-    "128": "images/mstile-150x150.png"
+    "128": "images/favicon-150x150.png"
   },
   "incognito": "split"
 }
