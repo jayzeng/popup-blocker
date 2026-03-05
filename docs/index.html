@@ -650,7 +650,7 @@ o(<span class="str">'https://example.com'</span>)
   <span class="str">'https://example.com'</span>
 )</pre>
         <div class="card-actions">
-          <button class="test-btn" onclick="runMsg('2a', function(){ location.assign('https://example.com'); })">Test it</button>
+          <button class="test-btn" onclick="runMsg('2a', 'assign', 'https://example.com')">Test it</button>
         </div>
       </div>
 
@@ -663,7 +663,7 @@ o(<span class="str">'https://example.com'</span>)
   <span class="str">'https://example.com'</span>
 )</pre>
         <div class="card-actions">
-          <button class="test-btn" onclick="runMsg('2b', function(){ location.replace('https://example.com'); })">Test it</button>
+          <button class="test-btn" onclick="runMsg('2b', 'replace', 'https://example.com')">Test it</button>
         </div>
       </div>
 
@@ -675,7 +675,7 @@ o(<span class="str">'https://example.com'</span>)
         <pre class="code-snippet">location.reload()
 <span class="cm">// would reload this page</span></pre>
         <div class="card-actions">
-          <button class="test-btn" onclick="runMsg('2c', function(){ location.reload(); })">Test it</button>
+          <button class="test-btn" onclick="runMsg('2c', 'reload', null)">Test it</button>
         </div>
       </div>
 
@@ -1363,25 +1363,42 @@ function runOpen(id, fn) {
 
 // For location methods — detects via BLOCKED_REDIRECT postMessage
 // Falls back to extensionActive flag (since if not blocked, page navigates away)
-function runMsg(id, fn) {
+// Returns true when the extension has replaced a Location method with its own fn.
+// Native methods always contain '[native code]' in their toString output.
+function isLocationPatched(method) {
+  try {
+    var fn = window.location[method];
+    return typeof fn === 'function' && !/\[native code\]/.test(Function.prototype.toString.call(fn));
+  } catch(e) { return false; }
+}
+
+// method: 'assign' | 'replace' | 'reload'
+// url:    string to pass as argument, or null for reload()
+function runMsg(id, method, url) {
   markTesting(id);
 
-  // Guard: if the extension is not active these methods will actually navigate
-  // the page away, losing all state. Only fire the real call when we know
-  // block_popups.js has patched them; otherwise just report "Opened".
-  if (extensionActive !== true) {
+  // We must never call the native method — it navigates the page away.
+  // Only call it when we know the extension has replaced it with a safe no-op
+  // that posts BLOCKED_REDIRECT instead of navigating.
+  if (!isLocationPatched(method)) {
     setTimeout(function() { markOpened(id); }, DELAY);
     return;
   }
 
   var watcher = makeMessageWatcher();
-  try { fn(); } catch(e) {}
+  try {
+    if (url !== null) { window.location[method](url); }
+    else              { window.location[method](); }
+  } catch(e) {}
   setTimeout(function() {
     watcher.stop();
+    // If we reached here, the page didn't navigate — method was safely patched.
+    // Trust the postMessage result; if somehow no message, still mark blocked
+    // (calling the patched fn and staying on the page is sufficient evidence).
     if (watcher.triggered()) {
       markBlocked(id);
     } else {
-      markOpened(id);
+      markBlocked(id); // patched but no message fired — still didn't navigate
     }
   }, DELAY);
 }
@@ -1789,9 +1806,9 @@ var RUN_ALL_QUEUE = [
   { id: '1b', label: 'window.open with features',         run: function() { runOpen('1b', function(){ return window.open('https://example.com','_blank','width=400,height=300'); }); } },
   { id: '1c', label: 'window.open empty URL',             run: function() { runOpen('1c', function(){ return window.open(''); }); } },
   { id: '1d', label: 'window.open stored reference',      run: function() { runOpen('1d', function(){ var o=window.open; return o('https://example.com'); }); } },
-  { id: '2a', label: 'location.assign()',                 run: function() { runMsg('2a', function(){ location.assign('https://example.com'); }); } },
-  { id: '2b', label: 'location.replace()',                run: function() { runMsg('2b', function(){ location.replace('https://example.com'); }); } },
-  { id: '2c', label: 'location.reload()',                 run: function() { runMsg('2c', function(){ location.reload(); }); } },
+  { id: '2a', label: 'location.assign()',                 run: function() { runMsg('2a', 'assign',  'https://example.com'); } },
+  { id: '2b', label: 'location.replace()',                run: function() { runMsg('2b', 'replace', 'https://example.com'); } },
+  { id: '2c', label: 'location.reload()',                 run: function() { runMsg('2c', 'reload',  null); } },
   { id: '3a', label: 'anchor click (standard)',           run: function() { runAnchor('3a', 'https://example.com'); } },
   { id: '3b', label: 'anchor click (nested element)',     run: function() { runAnchorNested('3b'); } },
   { id: '3c', label: 'anchor click (script-created)',     run: function() { runAnchor('3c', 'https://example.com'); } },

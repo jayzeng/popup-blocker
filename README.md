@@ -6,6 +6,16 @@ No build step — plain JS files loaded directly as an unpacked extension.
 
 ---
 
+## Demo
+
+Live demo and documentation site:
+
+- https://jayzeng.github.io/popup-blocker/
+
+The demo explains how popup interception works across service worker, content script, and page context, and includes usage/setup notes for running the extension locally.
+
+---
+
 ## Features
 
 - Enable/disable blocking per site with one click
