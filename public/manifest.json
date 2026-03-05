@@ -8,7 +8,6 @@
     "storage",
     "tabs",
     "webNavigation",
-    "management",
     "windows"
   ],
   "host_permissions": [
@@ -21,12 +20,13 @@
     {
       "matches": ["<all_urls>"],
       "js": ["content.js"],
-      "run_at": "document_start"
+      "run_at": "document_start",
+      "all_frames": true
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["block_popups.js"],
+      "resources": ["block_popups.js", "unblock_popups.js"],
       "matches": ["<all_urls>"]
     }
   ],

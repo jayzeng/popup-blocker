@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "build": "webpack --config webpack.config.js",
+    "dev": "webpack --config webpack.config.js --watch",
     "test": "jest",
     "lint": "eslint . --ext .ts,.tsx"
   },
@@ -26,7 +27,9 @@
     "copy-webpack-plugin": "^11.0.0",
     "css-loader": "^7.1.2",
     "eslint": "^8.16.0",
+    "eslint-plugin-react": "^7.37.5",
     "jest": "^28.1.0",
+    "jest-environment-jsdom": "^29.7.0",
     "prettier": "^2.6.2",
     "style-loader": "^4.0.0",
     "ts-jest": "^28.0.3",
