@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Yet Another Popup Blocker",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A simple popup blocker with per-site activation and incognito mode support",
   "permissions": [
     "activeTab",
@@ -18,16 +18,25 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_start",
       "all_frames": true
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["block_popups.js", "unblock_popups.js"],
-      "matches": ["<all_urls>"]
+      "resources": [
+        "block_popups.js",
+        "unblock_popups.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ],
   "action": {
