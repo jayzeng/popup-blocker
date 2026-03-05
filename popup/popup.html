@@ -10,6 +10,11 @@
   <div class="popup-container">
     <h1 class="title">Yet Another Popup Blocker</h1>
 
+    <div class="global-row">
+      <span class="info-label">Block popups globally:</span>
+      <button id="toggleGlobal" class="toggle-global-btn global-on">ON</button>
+    </div>
+
     <div id="coverageStatus" class="coverage-status not-covered"></div>
 
     <div class="info-container">
@@ -26,7 +31,7 @@
     <button id="toggleBlocking" class="toggle-button allowed">Enable Blocking</button>
 
     <div class="blocked-sites-list">
-      <h2>Blocked Sites</h2>
+      <h2 id="sitesListTitle">Blocked Sites</h2>
       <ul id="blockedSitesList"></ul>
       <p id="emptyState">No sites are currently blocked.</p>
     </div>

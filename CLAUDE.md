@@ -42,3 +42,12 @@ background → popup: UPDATE_BLOCKING_STATUS (count updates)
 - Blocked sites are stored in `chrome.storage.local` and loaded into the in-memory `blockedSites[]` array on startup.
 - Incognito support uses `"incognito": "split"` in manifest; sites blocked in incognito have `isMasked: true`.
 - CI (`build.yml`) builds on push to `main` and creates a timestamped git tag.
+
+## Changelog
+
+**Every user-visible change MUST be recorded in `CHANGELOG.md` before merging.**
+
+- Follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format with an `[Unreleased]` section at the top.
+- Categorize entries under `Added`, `Changed`, `Fixed`, `Removed`, or `Security`.
+- The release workflow bumps the version and promotes `[Unreleased]` to a dated `[X.Y.Z]` section — do not manually version the changelog.
+- `CHANGELOG.md` is included in the release zip so users installing from a GitHub Release can read the history.

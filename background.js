@@ -1,6 +1,8 @@
 const STORAGE_KEY_BLOCKED_SITES = 'BLOCKED_SITES';
+const STORAGE_KEY_GLOBAL_ENABLED = 'GLOBAL_ENABLED';
 
 let blockedSites = [];
+let globalBlockingEnabled = true;
 let storageReady = false;
 const storageReadyQueue = [];
 
@@ -24,6 +26,7 @@ function sanitizeBlockedSites(value) {
           ? Math.floor(site.blockedCount)
           : 0,
       isMasked: site.isMasked === true,
+      allowedUntil: typeof site.allowedUntil === 'number' ? site.allowedUntil : null,
     }))
     .filter((site) => site.hostname.length > 0);
 }
@@ -33,8 +36,34 @@ function findBlockedSite(hostname) {
   return blockedSites.find((site) => normalizeHostname(site.hostname) === normalized);
 }
 
+function shouldBlock(hostname) {
+  const site = findBlockedSite(hostname);
+  if (globalBlockingEnabled) {
+    if (!site || site.isBlocked !== false) return true;
+    // Temporary exception: check if it has expired
+    if (site.allowedUntil !== null && Date.now() > site.allowedUntil) return true;
+    return false;
+  } else {
+    if (!site || !site.isBlocked) return false;
+    return true;
+  }
+}
+
+function cleanExpiredExceptions() {
+  const now = Date.now();
+  const before = blockedSites.length;
+  blockedSites = blockedSites.filter(
+    (site) => !(site.isBlocked === false && site.allowedUntil !== null && now > site.allowedUntil)
+  );
+  if (blockedSites.length !== before) saveBlockedSites();
+}
+
 function saveBlockedSites() {
   chrome.storage.local.set({ [STORAGE_KEY_BLOCKED_SITES]: blockedSites });
+}
+
+function saveGlobalEnabled() {
+  chrome.storage.local.set({ [STORAGE_KEY_GLOBAL_ENABLED]: globalBlockingEnabled });
 }
 
 function runWhenStorageReady(fn) {
@@ -54,8 +83,10 @@ function markStorageReady() {
 }
 
 function initializeState() {
-  chrome.storage.local.get([STORAGE_KEY_BLOCKED_SITES], (result) => {
+  chrome.storage.local.get([STORAGE_KEY_BLOCKED_SITES, STORAGE_KEY_GLOBAL_ENABLED], (result) => {
     blockedSites = sanitizeBlockedSites(result[STORAGE_KEY_BLOCKED_SITES]);
+    globalBlockingEnabled = result[STORAGE_KEY_GLOBAL_ENABLED] !== false;
+    cleanExpiredExceptions();
     markStorageReady();
   });
 }
@@ -67,8 +98,16 @@ function sendActiveTabStatusUpdate(payload) {
     chrome.tabs.sendMessage(activeTabId, {
       type: 'UPDATE_BLOCKING_STATUS',
       data: payload,
-    });
+    }, () => { chrome.runtime.lastError; });
   });
+}
+
+function notifyTabPopupBlocked(tabId, blockedCount) {
+  if (tabId === undefined || tabId === null) return;
+  chrome.tabs.sendMessage(tabId, {
+    type: 'POPUP_BLOCKED',
+    data: { blockedCount },
+  }, () => { chrome.runtime.lastError; });
 }
 
 function resolveHostname(hostname, sender) {
@@ -88,7 +127,12 @@ function isValidMessage(message) {
   const data = message.data;
   switch (message.type) {
     case 'TOGGLE_BLOCKING':
-      return data && typeof data.hostname === 'string' && typeof data.isIncognito === 'boolean';
+      return (
+        data &&
+        typeof data.hostname === 'string' &&
+        typeof data.isIncognito === 'boolean' &&
+        (data.allowedUntil === undefined || data.allowedUntil === null || typeof data.allowedUntil === 'number')
+      );
     case 'GET_BLOCKING_STATUS':
       return data && typeof data.hostname === 'string';
     case 'INCREMENT_BLOCKED_COUNT':
@@ -97,18 +141,48 @@ function isValidMessage(message) {
       return data && typeof data.hostname === 'string';
     case 'GET_BLOCKED_SITES':
       return true;
+    case 'SET_GLOBAL_BLOCKING':
+      return data && typeof data.enabled === 'boolean';
     default:
       return false;
   }
 }
 
+function ensureSiteEntry(hostname, isMasked) {
+  let site = findBlockedSite(hostname);
+  if (!site) {
+    site = { hostname, isBlocked: true, blockedCount: 0, isMasked: !!isMasked, allowedUntil: null };
+    blockedSites.push(site);
+  }
+  return site;
+}
+
 initializeState();
-chrome.runtime.onInstalled.addListener(initializeState);
+
+// Clean expired exceptions once per minute while the worker is alive
+setInterval(cleanExpiredExceptions, 60 * 1000);
+
+chrome.runtime.onInstalled.addListener((details) => {
+  if (details.reason === 'install') {
+    chrome.storage.local.get([STORAGE_KEY_GLOBAL_ENABLED], (result) => {
+      if (result[STORAGE_KEY_GLOBAL_ENABLED] === undefined) {
+        chrome.storage.local.set({ [STORAGE_KEY_GLOBAL_ENABLED]: true });
+      }
+    });
+  }
+  initializeState();
+});
+
 chrome.runtime.onStartup.addListener(initializeState);
 
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area !== 'local' || !changes[STORAGE_KEY_BLOCKED_SITES]) return;
-  blockedSites = sanitizeBlockedSites(changes[STORAGE_KEY_BLOCKED_SITES].newValue);
+  if (area !== 'local') return;
+  if (changes[STORAGE_KEY_BLOCKED_SITES]) {
+    blockedSites = sanitizeBlockedSites(changes[STORAGE_KEY_BLOCKED_SITES].newValue);
+  }
+  if (changes[STORAGE_KEY_GLOBAL_ENABLED]) {
+    globalBlockingEnabled = changes[STORAGE_KEY_GLOBAL_ENABLED].newValue !== false;
+  }
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -118,37 +192,66 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return;
     }
 
+    if (message.type === 'SET_GLOBAL_BLOCKING') {
+      globalBlockingEnabled = message.data.enabled;
+      saveGlobalEnabled();
+      sendActiveTabStatusUpdate({ isBlocked: shouldBlock(''), globalBlockingEnabled });
+      sendResponse({ globalBlockingEnabled });
+      return;
+    }
+
     if (message.type === 'TOGGLE_BLOCKING') {
       const hostname = normalizeHostname(message.data.hostname);
+      const allowedUntil = message.data.allowedUntil !== undefined ? message.data.allowedUntil : null;
       const existing = findBlockedSite(hostname);
 
+      if (globalBlockingEnabled) {
+        if (!existing || existing.isBlocked !== false || (existing.allowedUntil !== null && Date.now() > existing.allowedUntil)) {
+          // Add/update exception: allow this site
+          if (!existing) {
+            blockedSites.push({ hostname, isBlocked: false, blockedCount: 0, isMasked: message.data.isIncognito, allowedUntil });
+          } else {
+            existing.isBlocked = false;
+            existing.allowedUntil = allowedUntil;
+          }
+          saveBlockedSites();
+          const count = existing ? existing.blockedCount : 0;
+          sendActiveTabStatusUpdate({ isBlocked: false, blockedCount: count, globalBlockingEnabled });
+          sendResponse({ isBlocked: false, blockedCount: count, blockedSites, globalBlockingEnabled });
+        } else {
+          // Remove exception: revert to global default (blocked)
+          blockedSites = blockedSites.filter((site) => normalizeHostname(site.hostname) !== hostname);
+          saveBlockedSites();
+          sendActiveTabStatusUpdate({ isBlocked: true, blockedCount: 0, globalBlockingEnabled });
+          sendResponse({ isBlocked: true, blockedCount: 0, blockedSites, globalBlockingEnabled });
+        }
+        return;
+      }
+
+      // Global OFF: original opt-in per-site behavior
       if (!existing) {
-        const site = {
-          hostname,
-          isBlocked: true,
-          blockedCount: 0,
-          isMasked: message.data.isIncognito,
-        };
-        blockedSites.push(site);
+        blockedSites.push({ hostname, isBlocked: true, blockedCount: 0, isMasked: message.data.isIncognito, allowedUntil: null });
         saveBlockedSites();
-        sendActiveTabStatusUpdate({ isBlocked: true, blockedCount: 0 });
-        sendResponse({ isBlocked: true, blockedCount: 0, blockedSites });
+        sendActiveTabStatusUpdate({ isBlocked: true, blockedCount: 0, globalBlockingEnabled });
+        sendResponse({ isBlocked: true, blockedCount: 0, blockedSites, globalBlockingEnabled });
         return;
       }
 
       blockedSites = blockedSites.filter((site) => normalizeHostname(site.hostname) !== hostname);
       saveBlockedSites();
-      sendActiveTabStatusUpdate({ isBlocked: false, blockedCount: existing.blockedCount });
-      sendResponse({ isBlocked: false, blockedCount: existing.blockedCount, blockedSites });
+      sendActiveTabStatusUpdate({ isBlocked: false, blockedCount: existing.blockedCount, globalBlockingEnabled });
+      sendResponse({ isBlocked: false, blockedCount: existing.blockedCount, blockedSites, globalBlockingEnabled });
       return;
     }
 
     if (message.type === 'GET_BLOCKING_STATUS') {
       const hostname = resolveHostname(message.data.hostname, sender);
       const site = findBlockedSite(hostname);
+      const isBlocked = hostname ? shouldBlock(hostname) : globalBlockingEnabled;
       sendResponse({
-        isBlocked: site ? site.isBlocked : false,
+        isBlocked,
         blockedCount: site ? site.blockedCount : 0,
+        globalBlockingEnabled,
       });
       return;
     }
@@ -165,8 +268,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       saveBlockedSites();
       chrome.runtime.sendMessage({
         type: 'UPDATE_BLOCKING_STATUS',
-        data: { isBlocked: true, blockedCount: site.blockedCount },
-      });
+        data: { isBlocked: true, blockedCount: site.blockedCount, globalBlockingEnabled },
+      }, () => { chrome.runtime.lastError; });
+      // Send confirmed count back to the source tab
+      if (sender.tab && sender.tab.id !== undefined) {
+        notifyTabPopupBlocked(sender.tab.id, site.blockedCount);
+      }
       sendResponse({ blockedCount: site.blockedCount });
       return;
     }
@@ -199,16 +306,18 @@ chrome.webNavigation.onCreatedNavigationTarget.addListener((details) => {
 
     try {
       const sourceHostname = normalizeHostname(new URL(sourceTab.url).hostname);
-      const site = findBlockedSite(sourceHostname);
-      if (!site || !site.isBlocked) return;
+      if (!shouldBlock(sourceHostname)) return;
 
       chrome.tabs.remove(details.tabId);
+
+      const site = ensureSiteEntry(sourceHostname, sourceTab.incognito);
       site.blockedCount += 1;
       saveBlockedSites();
       chrome.runtime.sendMessage({
         type: 'UPDATE_BLOCKING_STATUS',
-        data: { isBlocked: true, blockedCount: site.blockedCount },
-      });
+        data: { isBlocked: true, blockedCount: site.blockedCount, globalBlockingEnabled },
+      }, () => { chrome.runtime.lastError; });
+      notifyTabPopupBlocked(details.sourceTabId, site.blockedCount);
     } catch (_) {
       // Ignore invalid URLs (chrome:// etc.)
     }
@@ -227,16 +336,18 @@ chrome.windows.onCreated.addListener((win) => {
 
       try {
         const sourceHostname = normalizeHostname(new URL(openerTab.url).hostname);
-        const site = findBlockedSite(sourceHostname);
-        if (!site || !site.isBlocked) return;
+        if (!shouldBlock(sourceHostname)) return;
 
         chrome.windows.remove(win.id);
+
+        const site = ensureSiteEntry(sourceHostname, openerTab.incognito);
         site.blockedCount += 1;
         saveBlockedSites();
         chrome.runtime.sendMessage({
           type: 'UPDATE_BLOCKING_STATUS',
-          data: { isBlocked: true, blockedCount: site.blockedCount },
-        });
+          data: { isBlocked: true, blockedCount: site.blockedCount, globalBlockingEnabled },
+        }, () => { chrome.runtime.lastError; });
+        notifyTabPopupBlocked(popupTab.openerTabId, site.blockedCount);
       } catch (_) {
         // Ignore invalid URLs.
       }

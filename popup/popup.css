@@ -19,6 +19,33 @@ body {
   text-align: center;
 }
 
+.global-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.toggle-global-btn {
+  border: 0;
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  min-width: 42px;
+}
+
+.toggle-global-btn.global-on {
+  background: #29a45a;
+  color: #fff;
+}
+
+.toggle-global-btn.global-off {
+  background: #ccc;
+  color: #444;
+}
+
 .coverage-status {
   padding: 10px;
   border-radius: 8px;

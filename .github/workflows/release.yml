@@ -56,11 +56,19 @@ jobs:
       - name: Test
         run: npm test -- --runInBand
 
+      - name: Promote changelog
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          DATE=$(date -u +%Y-%m-%d)
+          # Replace the first "## [Unreleased]" line with a versioned heading,
+          # then insert a fresh [Unreleased] section above it.
+          sed -i "s/^## \[Unreleased\]$/## [Unreleased]\n\n## [$VERSION] - $DATE/" CHANGELOG.md
+
       - name: Commit version bump
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package.json manifest.json
+          git add package.json manifest.json CHANGELOG.md
           git commit -m "Release v${{ steps.version.outputs.version }}"
           git push origin HEAD
 
@@ -86,7 +94,8 @@ jobs:
             manifest.json \
             popup \
             icons \
-            README.md
+            README.md \
+            CHANGELOG.md
           echo "zip_name=$ZIP_NAME" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub release
