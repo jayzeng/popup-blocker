@@ -12,7 +12,8 @@
     "extension",
     "popup-blocker"
   ],
-  "license": "ISC",
+  "author": "Jay Zeng <jayzeng@jay-zeng.com>",
+  "license": "MIT",
   "devDependencies": {
     "eslint": "^8.16.0",
     "jest": "^28.1.0",

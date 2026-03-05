@@ -1,0 +1,2042 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Yet Another Popup Blocker — Demo &amp; QA Sandbox</title>
+  <style>
+    :root {
+      --bg:         #18181b;
+      --surface:    #27272a;
+      --border:     #3f3f46;
+      --accent:     #ef4444;
+      --accent-bg:  rgba(239, 68, 68, 0.12);
+      --text:       #f4f4f5;
+      --muted:      #a1a1aa;
+      --code-bg:    #09090b;
+      --green:      #22c55e;
+      --green-bg:   rgba(34, 197, 94, 0.12);
+      --yellow:     #eab308;
+      --yellow-bg:  rgba(234, 179, 8, 0.12);
+      --blue:       #60a5fa;
+      --blue-bg:    rgba(96, 165, 250, 0.12);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    /* ---- Header ---- */
+    .site-header {
+      border-bottom: 1px solid var(--border);
+      padding: 20px 0;
+    }
+    .header-inner {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .logo {
+      width: 38px;
+      height: 38px;
+      background: var(--accent);
+      border-radius: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 19px;
+      flex-shrink: 0;
+    }
+    .header-text h1 {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+    .header-text p {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 1px;
+    }
+    .header-links {
+      margin-left: auto;
+      display: flex;
+      gap: 8px;
+    }
+    .header-link {
+      font-size: 12px;
+      color: var(--muted);
+      text-decoration: none;
+      padding: 5px 12px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      transition: color 0.15s, border-color 0.15s;
+      white-space: nowrap;
+    }
+    .header-link:hover { color: var(--text); border-color: var(--muted); }
+
+    /* ---- Main layout ---- */
+    .main {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 32px 24px 64px;
+    }
+
+    /* ---- Status bar ---- */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-bottom: 40px;
+    }
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+    }
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      transition: background 0.3s, box-shadow 0.3s;
+    }
+    .status-dot.checking { background: var(--muted); animation: blink 1.2s ease-in-out infinite; }
+    .status-dot.active   { background: var(--green); box-shadow: 0 0 0 3px rgba(34,197,94,0.2); }
+    .status-dot.inactive { background: var(--yellow); box-shadow: 0 0 0 3px rgba(234,179,8,0.2); }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.35} }
+
+    .status-body {}
+    .status-text {
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .status-sub {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .session-counter {
+      text-align: right;
+      flex-shrink: 0;
+    }
+    .counter-value {
+      font-size: 30px;
+      font-weight: 800;
+      color: var(--accent);
+      line-height: 1;
+      transition: transform 0.2s;
+    }
+    .counter-value.bump { animation: countbump 0.25s cubic-bezier(.34,1.56,.64,1) forwards; }
+    @keyframes countbump { 0%{transform:scale(1)} 50%{transform:scale(1.4)} 100%{transform:scale(1)} }
+    .counter-label {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-top: 3px;
+    }
+
+    /* ---- Section ---- */
+    .section { margin-bottom: 44px; }
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .section-icon { font-size: 17px; }
+    .section-title { font-size: 15px; font-weight: 700; }
+    .section-tally {
+      font-size: 11px;
+      color: var(--muted);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 2px 8px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ---- Card grid ---- */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+      gap: 10px;
+    }
+
+    /* ---- Card ---- */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 11px;
+    }
+    .card.info-card { border-style: dashed; }
+
+    .card-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .card-title { font-size: 13px; font-weight: 600; line-height: 1.4; }
+
+    /* ---- Badge ---- */
+    .badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 7px;
+      border-radius: 5px;
+      white-space: nowrap;
+      flex-shrink: 0;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      transition: background 0.2s, color 0.2s;
+    }
+    .badge.pending  { background: rgba(161,161,170,.15); color: var(--muted); }
+    .badge.blocked  { background: var(--accent-bg);      color: var(--accent); }
+    .badge.opened   { background: var(--yellow-bg);      color: var(--yellow); }
+    .badge.manual   { background: var(--blue-bg);        color: var(--blue); }
+
+    /* ---- Code snippet ---- */
+    .code-snippet {
+      font-family: 'Menlo', 'Monaco', 'Cascadia Code', 'Fira Code', monospace;
+      font-size: 11.5px;
+      background: var(--code-bg);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 7px;
+      padding: 9px 11px;
+      color: #e2e8f0;
+      overflow-x: auto;
+      white-space: pre;
+      line-height: 1.55;
+      flex: 1;
+    }
+    .snippet-wrap {
+      position: relative;
+      min-height: 44px;
+    }
+    .snippet-wrap .code-snippet {
+      margin: 0;
+      padding-right: 62px;
+    }
+    .copy-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: rgba(24,24,27,0.92);
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 8px;
+      line-height: 1;
+      cursor: pointer;
+      font-family: inherit;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+      z-index: 1;
+    }
+    .copy-btn:hover {
+      color: var(--text);
+      border-color: var(--muted);
+    }
+    .copy-btn.copied {
+      color: var(--green);
+      border-color: rgba(34,197,94,0.45);
+      background: rgba(34,197,94,0.12);
+    }
+    .kw  { color: #93c5fd; }
+    .fn  { color: #c4b5fd; }
+    .str { color: #86efac; }
+    .cm  { color: #52525b; font-style: italic; }
+    .op  { color: #f9a8d4; }
+
+    /* ---- Buttons ---- */
+    .card-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .test-btn {
+      flex: 1;
+      min-width: 80px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.15s, transform 0.1s, opacity 0.15s;
+    }
+    .test-btn:hover   { background: #dc2626; }
+    .test-btn:active  { transform: scale(0.97); }
+    .test-btn:disabled {
+      background: var(--border);
+      color: var(--muted);
+      cursor: not-allowed;
+      transform: none;
+    }
+    .manual-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      color: var(--blue);
+      font-size: 12px;
+      padding: 6px 12px;
+      border: 1px solid rgba(96,165,250,0.3);
+      border-radius: 7px;
+      text-decoration: none;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .manual-link:hover { background: var(--blue-bg); }
+
+    .info-note {
+      font-size: 11.5px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    .info-note strong { color: var(--text); }
+
+    /* ---- Fixed summary panel ---- */
+    .summary-panel {
+      position: fixed;
+      right: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 500;
+      width: 168px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.45);
+    }
+    .panel-stats { display: flex; flex-direction: column; gap: 9px; }
+    .panel-stat { display: flex; align-items: baseline; gap: 8px; }
+    .panel-stat-value {
+      font-size: 22px;
+      font-weight: 800;
+      line-height: 1;
+      min-width: 32px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+    #sumBlocked { color: var(--accent); }
+    #sumOpened  { color: var(--yellow); }
+    #sumPending { color: var(--muted); }
+    .panel-stat-label {
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+    }
+    .panel-divider { height: 1px; background: var(--border); margin: 0 -2px; }
+
+    /* ---- Split run button ---- */
+    .run-split { position: relative; display: flex; }
+    .run-split-main {
+      flex: 1;
+      border: 1px solid var(--accent);
+      border-right: none;
+      border-radius: 7px 0 0 7px;
+      background: transparent;
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 7px 8px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.15s;
+      white-space: nowrap;
+      text-align: left;
+    }
+    .run-split-main:hover { background: var(--accent-bg); }
+    .run-split-chevron {
+      border: 1px solid var(--accent);
+      border-radius: 0 7px 7px 0;
+      background: transparent;
+      color: var(--accent);
+      font-size: 10px;
+      padding: 7px 8px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.15s;
+    }
+    .run-split-chevron:hover { background: var(--accent-bg); }
+    .run-split-main:disabled,
+    .run-split-chevron:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    /* ---- Run dropdown ---- */
+    .run-dropdown {
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 0;
+      min-width: 210px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 4px;
+      box-shadow: 0 -4px 24px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04);
+      display: none;
+      z-index: 10;
+    }
+    .run-dropdown.open { display: block; }
+    .run-dd-item {
+      display: block;
+      width: 100%;
+      background: none;
+      border: none;
+      border-radius: 6px;
+      color: var(--text);
+      text-align: left;
+      padding: 7px 10px;
+      font-size: 12px;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.12s;
+      white-space: nowrap;
+    }
+    .run-dd-item:hover { background: rgba(255,255,255,0.07); }
+    .run-dd-item.dd-all { color: var(--accent); font-weight: 700; }
+    .run-dd-sep { height: 1px; background: var(--border); margin: 3px 6px; }
+
+    /* ---- Panel reset button ---- */
+    .panel-reset-btn {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 7px;
+      padding: 7px;
+      font-size: 12px;
+      font-family: inherit;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+      width: 100%;
+    }
+    .panel-reset-btn:hover { color: var(--text); border-color: var(--muted); }
+
+    /* ---- Footer ---- */
+    .site-footer {
+      text-align: center;
+      padding: 20px 24px;
+      color: var(--muted);
+      font-size: 12px;
+      border-top: 1px solid var(--border);
+    }
+    .site-footer a { color: var(--muted); text-decoration: none; }
+    .site-footer a:hover { color: var(--text); }
+
+    /* ---- Card running state ---- */
+    .card {
+      transition: border-color 0.25s, box-shadow 0.25s;
+    }
+    .card.running {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(239,68,68,0.18), 0 8px 32px rgba(239,68,68,0.12);
+    }
+
+    /* ---- Run-All progress overlay ---- */
+    .run-all-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 10000;
+      pointer-events: none;
+      display: none;
+    }
+    .run-all-overlay.active { display: block; }
+    .run-progress-track {
+      height: 3px;
+      background: rgba(255,255,255,0.08);
+    }
+    .run-progress-fill {
+      height: 100%;
+      background: var(--accent);
+      width: 0%;
+      transition: width 0.45s cubic-bezier(.4,0,.2,1);
+    }
+    .run-step-label {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 5px 16px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+    }
+    .run-step-label .step-num {
+      color: var(--accent);
+      margin-right: 6px;
+    }
+
+    /* ---- Section run button ---- */
+    .section-run-btn {
+      margin-left: auto;
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 6px;
+      padding: 3px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+      white-space: nowrap;
+    }
+    .section-run-btn:hover { color: var(--accent); border-color: var(--accent); }
+    .section-run-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    @media (max-width: 900px) {
+      .summary-panel { display: none; }
+    }
+    @media (max-width: 640px) {
+      .header-inner { flex-wrap: wrap; }
+      .header-links { margin-left: 0; width: 100%; }
+      .status-bar { flex-direction: column; align-items: flex-start; }
+      .session-counter { align-self: flex-end; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ================================================================
+     HEADER
+================================================================ -->
+<header class="site-header">
+  <div class="header-inner">
+    <div class="logo" aria-hidden="true">&#128683;</div>
+    <div class="header-text">
+      <h1>Yet Another Popup Blocker</h1>
+      <p>Interactive demo &amp; QA sandbox</p>
+    </div>
+    <nav class="header-links">
+      <a class="header-link" href="https://github.com/jayzeng/popup-blocker" target="_blank" rel="noopener">GitHub</a>
+      <a class="header-link" href="https://github.com/jayzeng/popup-blocker/releases" target="_blank" rel="noopener">Releases</a>
+    </nav>
+  </div>
+</header>
+
+<!-- ================================================================
+     MAIN
+================================================================ -->
+<main class="main">
+
+  <!-- Status bar -->
+  <div class="status-bar" role="status" aria-live="polite">
+    <div class="status-indicator">
+      <div class="status-dot checking" id="statusDot"></div>
+      <div class="status-body">
+        <div class="status-text" id="statusText">Checking&hellip;</div>
+        <div class="status-sub"  id="statusSub">Probing window.open behavior</div>
+      </div>
+    </div>
+    <div class="session-counter">
+      <div class="counter-value" id="sessionCount">0</div>
+      <div class="counter-label">blocked this session</div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       SECTION 1: window.open() Variants
+  ============================================================ -->
+  <section class="section">
+    <div class="section-header">
+      <span class="section-icon" aria-hidden="true">&#128167;</span>
+      <span class="section-title">window.open() Variants</span>
+      <span class="section-tally" id="tally-1">0 / 4</span>
+      <button class="section-run-btn" data-section="1" onclick="runSection('1')">&#9654; Run</button>
+    </div>
+    <div class="card-grid">
+
+      <div class="card">
+        <div class="card-top">
+          <span class="card-title">Basic call</span>
+          <span class="badge pending" id="badge-1a">Pending</span>
+        </div>
+        <pre class="code-snippet">window.open(<span class="str">'https://example.com'</span>)</pre>
+        <div class="card-actions">
+          <button class="test-btn" onclick="runOpen('1a', function(){ return window.open('https://example.com'); })">Test it</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-top">
+          <span class="card-title">With size features</span>
+          <span class="badge pending" id="badge-1b">Pending</span>
+        </div>
+        <pre class="code-snippet">window.open(url, <span class="str">'_blank'</span>,
+  <span class="str">'width=400,height=300'</span>)</pre>
+        <div class="card-actions">
+          <button class="test-btn" onclick="runOpen('1b', function(){ return window.open('https://example.com','_blank','width=400,height=300'); })">Test it</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-top">
+          <span class="card-title">Empty URL (blank tab)</span>
+          <span class="badge pending" id="badge-1c">Pending</span>
+        </div>
+        <pre class="code-snippet">window.open(<span class="str">''</span>)</pre>
+        <div class="card-actions">
+          <button class="test-btn" onclick="runOpen('1c', function(){ return window.open(''); })">Test it</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-top">
+          <span class="card-title">Stored reference</span>
+          <span class="badge pending" id="badge-1d">Pending</span>
+        </div>
+        <pre class="code-snippet"><span class="kw">var</span> o <span class="op">=</span> window.open;
+o(<span class="str">'https://example.com'</span>)
+<span class="cm">// page-context patch covers this</span></pre>
+        <div class="card-actions">
+          <button class="test-btn" onclick="runOpen('1d', function(){ var o=window.open; return o('https://example.com'); })">Test it</button>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================================================
+       SECTION 2: Location Redirects
+  ============================================================ -->
+  <section class="section">
+    <div class="section-header">
+      <span class="section-icon" aria-hidden="true">&#8618;</span>
+      <span class="section-title">Location Redirects</span>
+      <span class="section-tally" id="tally-2">0 / 3</span>
+      <button class="section-run-btn" data-section="2" onclick="runSection('2')">&#9654; Run</button>
+    </div>
+    <div class="card-grid">
+
+      <div class="card">
+        <div class="card-top">
+          <span class="card-title">location.assign()</span>
+          <span class="badge pending" id="badge-2a">Pending</span>
+        </div>
+        <pre class="code-snippet">location.assign(
+  <span class="str">'https://example.com'</span>
+)</pre>
+        <div class="card-actions">
+          <button class="test-btn" onclick="runMsg('2a', function(){ location.assign('https://example.com'); })">Test it</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-top">
+          <span class="card-title">location.replace()</span>
+          <span class="badge pending" id="badge-2b">Pending</span>
+        </div>
+        <pre class="code-snippet">location.replace(
+  <span class="str">'https://example.com'</span>
+)</pre>
+        <div class="card-actions">
+          <button class="test-btn" onclick="runMsg('2b', function(){ location.replace('https://example.com'); })">Test it</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-top">
+          <span class="card-title">location.reload()</span>
+          <span class="badge pending" id="badge-2c">Pending</span>
+        </div>
+        <pre class="code-snippet">location.reload()
+<span class="cm">// would reload this page</span></pre>
+        <div class="card-actions">
+          <button class="test-btn" onclick="runMsg('2c', function(){ location.reload(); })">Test it</button>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================================================
+       SECTION 3: HTML Links
+  ============================================================ -->
+  <section class="section">
+    <div class="section-header">
+      <span class="section-icon" aria-hidden="true">&#128279;</span>
+      <span class="section-title">HTML Links (target=&quot;_blank&quot;)</span>
+      <span class="section-tally" id="tally-3">0 / 3</span>
+      <button class="section-run-btn" data-section="3" onclick="runSection('3')">&#9654; Run</button>
+    </div>
+    <div class="card-grid">
+
+      <div class="card">
+        <div class="card-top">
+          <span class="card-title">Standard anchor click</span>
+          <span class="badge pending" id="badge-3a">Pending</span>
+        </div>
+        <pre class="code-snippet">&lt;<span class="kw">a</span> <span class="fn">href</span>=<span class="str">"url"</span>
+   <span class="fn">target</span>=<span class="str">"_blank"</span>&gt;Link&lt;/<span class="kw">a</span>&gt;</pre>
+        <div class="card-actions">
+          <button class="test-btn" onclick="runAnchor('3a', 'https://example.com')">Test it</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-top">
+          <span class="card-title">Nested element inside link</span>
+          <span class="badge pending" id="badge-3b">Pending</span>
+        </div>
+        <pre class="code-snippet">&lt;<span class="kw">a</span> <span class="fn">target</span>=<span class="str">"_blank"</span>&gt;
+  &lt;<span class="kw">span</span>&gt;Click me&lt;/<span class="kw">span</span>&gt;
+&lt;/<span class="kw">a</span>&gt;</pre>
+        <div class="card-actions">
+          <button class="test-btn" onclick="runAnchorNested('3b')">Test it</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-top">
+          <span class="card-title">Script-created anchor</span>
+          <span class="badge pending" id="badge-3c">Pending</span>
+        </div>
+        <pre class="code-snippet"><span class="kw">const</span> a <span class="op">=</span> document.createElement(<span class="str">'a'</span>)
+a.href <span class="op">=</span> url
+a.target <span class="op">=</span> <span class="str">'_blank'</span>
+a.click()</pre>
+        <div class="card-actions">
+          <button class="test-btn" onclick="runAnchor('3c', 'https://example.com')">Test it</button>
+        </div>
+      </div>
+
+      <div class="card info-card">
+        <div class="card-top">
+          <span class="card-title">Middle-click / Ctrl+click</span>
+          <span class="badge manual" id="badge-3d">Manual</span>
+        </div>
+        <pre class="code-snippet"><span class="cm">// Middle-click or Ctrl+click
+// triggers auxclick event</span></pre>
+        <div class="card-actions">
+          <a class="manual-link" href="https://example.com" target="_blank" rel="noopener">&#8599; Try middle-clicking here</a>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================================================
+       SECTION 4: Form Submissions
+  ============================================================ -->
+  <section class="section">
+    <div class="section-header">
+      <span class="section-icon" aria-hidden="true">&#128203;</span>
+      <span class="section-title">Form Submissions (target=&quot;_blank&quot;)</span>
+      <span class="section-tally" id="tally-4">0 / 3</span>
+      <button class="section-run-btn" data-section="4" onclick="runSection('4')">&#9654; Run</button>
+    </div>
+    <div class="card-grid">
+
+      <!-- Hidden forms used by tests -->
+      <form id="form-4a" target="_blank" action="https://example.com" style="display:none">
+        <button type="submit" id="submit-4a">Submit</button>
+      </form>
+      <form id="form-4b" target="_blank" action="https://example.com" style="display:none">
+        <input type="text" id="input-4b" value="test">
+      </form>
+      <form id="form-4c" target="_blank" action="about:blank" style="display:none"></form>
+
+      <div class="card">
+        <div class="card-top">
+          <span class="card-title">Submit button click</span>
+          <span class="badge pending" id="badge-4a">Pending</span>
+        </div>
+        <pre class="code-snippet">&lt;<span class="kw">form</span> <span class="fn">target</span>=<span class="str">"_blank"</span>&gt;
+  &lt;<span class="kw">button</span> <span class="fn">type</span>=<span class="str">"submit"</span>&gt;
+    Submit
+  &lt;/<span class="kw">button</span>&gt;
+&lt;/<span class="kw">form</span>&gt;</pre>
+        <div class="card-actions">
+          <button class="test-btn" onclick="runForm('4a')">Test it</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-top">
+          <span class="card-title">Enter key in text field</span>
+          <span class="badge pending" id="badge-4b">Pending</span>
+        </div>
+        <pre class="code-snippet">&lt;<span class="kw">form</span> <span class="fn">target</span>=<span class="str">"_blank"</span>&gt;
+  &lt;<span class="kw">input</span> <span class="fn">type</span>=<span class="str">"text"</span>&gt;
+&lt;/<span class="kw">form</span>&gt;
+<span class="cm">// press Enter in field</span></pre>
+        <div class="card-actions">
+          <button class="test-btn" onclick="runFormEnter('4b')">Test it</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-top">
+          <span class="card-title">Programmatic form.submit()</span>
+          <span class="badge pending" id="badge-4c">Pending</span>
+        </div>
+        <pre class="code-snippet">form.submit()
+<span class="cm">// bypasses submit event!
+// background script catches
+// the new tab/window instead</span></pre>
+        <div class="card-actions">
+          <button class="test-btn" onclick="runFormDotSubmit('4c')">Test it</button>
+        </div>
+        <div class="info-note"><strong>Note:</strong> form.submit() skips the content script. The background service worker intercepts the resulting navigation.</div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================================================
+       SECTION 5: Programmatic Anchor Clicks
+  ============================================================ -->
+  <section class="section">
+    <div class="section-header">
+      <span class="section-icon" aria-hidden="true">&#9889;</span>
+      <span class="section-title">Programmatic Anchor Clicks</span>
+      <span class="section-tally" id="tally-5">0 / 2</span>
+      <button class="section-run-btn" data-section="5" onclick="runSection('5')">&#9654; Run</button>
+    </div>
+    <div class="card-grid">
+
+      <div class="card">
+        <div class="card-top">
+          <span class="card-title">Appended anchor + click()</span>
+          <span class="badge pending" id="badge-5a">Pending</span>
+        </div>
+        <pre class="code-snippet"><span class="kw">const</span> a <span class="op">=</span> document.createElement(<span class="str">'a'</span>)
+a.href <span class="op">=</span> url
+a.target <span class="op">=</span> <span class="str">'_blank'</span>
+document.body.appendChild(a)
+a.click()</pre>
+        <div class="card-actions">
+          <button class="test-btn" onclick="runAnchorAppend('5a', false)">Test it</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-top">
+          <span class="card-title">Hidden anchor + click()</span>
+          <span class="badge pending" id="badge-5b">Pending</span>
+        </div>
+        <pre class="code-snippet"><span class="kw">const</span> a <span class="op">=</span> document.createElement(<span class="str">'a'</span>)
+a.style.display <span class="op">=</span> <span class="str">'none'</span>
+a.href <span class="op">=</span> url
+a.target <span class="op">=</span> <span class="str">'_blank'</span>
+document.body.appendChild(a)
+a.click()</pre>
+        <div class="card-actions">
+          <button class="test-btn" onclick="runAnchorAppend('5b', true)">Test it</button>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================================================
+       SECTION 6: Bypass Attempts
+  ============================================================ -->
+  <section class="section">
+    <div class="section-header">
+      <span class="section-icon" aria-hidden="true">&#128737;</span>
+      <span class="section-title">Bypass Attempts — QA Hardening</span>
+      <span class="section-tally" id="tally-6">0 / 4</span>
+      <button class="section-run-btn" data-section="6" onclick="runSection('6')">&#9654; Run</button>
+    </div>
+    <div class="card-grid">
+
+      <div class="card">
+        <div class="card-top">
+          <span class="card-title">Stored reference call</span>
+          <span class="badge pending" id="badge-6a">Pending</span>
+        </div>
+        <pre class="code-snippet"><span class="kw">var</span> o <span class="op">=</span> window.open;
+<span class="cm">// page patch covers the binding</span>
+o(<span class="str">'https://example.com'</span>)</pre>
+        <div class="card-actions">
+          <button class="test-btn" onclick="runOpen('6a', function(){ var o=window.open; return o('https://example.com'); })">Test it</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-top">
+          <span class="card-title">Reassign window.open</span>
+          <span class="badge pending" id="badge-6b">Pending</span>
+        </div>
+        <pre class="code-snippet">window.open <span class="op">=</span> customFn;
+<span class="cm">// writable:false — silently fails
+// 500ms interval re-patches</span>
+window.open(<span class="str">'url'</span>)</pre>
+        <div class="card-actions">
+          <button class="test-btn" onclick="runReassignTest('6b')">Test it</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-top">
+          <span class="card-title">Object.defineProperty override</span>
+          <span class="badge pending" id="badge-6c">Pending</span>
+        </div>
+        <pre class="code-snippet"><span class="kw">try</span> {
+  Object.defineProperty(
+    window, <span class="str">'open'</span>, { value: fn }
+  )
+} <span class="kw">catch</span>(e) { <span class="cm">/* throws */</span> }
+window.open(<span class="str">'url'</span>)</pre>
+        <div class="card-actions">
+          <button class="test-btn" onclick="runDefinePropertyTest('6c')">Test it</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-top">
+          <span class="card-title">IIFE with window alias</span>
+          <span class="badge pending" id="badge-6d">Pending</span>
+        </div>
+        <pre class="code-snippet">(<span class="kw">function</span>(w) {
+  w.open(<span class="str">'https://example.com'</span>)
+})(window)
+<span class="cm">// w === window — still patched</span></pre>
+        <div class="card-actions">
+          <button class="test-btn" onclick="runOpen('6d', function(){ return (function(w){ return w.open('https://example.com'); })(window); })">Test it</button>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================================================
+       SECTION 7: Timing Variants
+  ============================================================ -->
+  <section class="section">
+    <div class="section-header">
+      <span class="section-icon" aria-hidden="true">&#9201;</span>
+      <span class="section-title">Timing Variants</span>
+      <span class="section-tally" id="tally-7">0 / 4</span>
+      <button class="section-run-btn" data-section="7" onclick="runSection('7')">&#9654; Run</button>
+    </div>
+    <div class="card-grid">
+
+      <div class="card">
+        <div class="card-top">
+          <span class="card-title">Delayed open (1 second)</span>
+          <span class="badge pending" id="badge-7a">Pending</span>
+        </div>
+        <pre class="code-snippet">setTimeout(<span class="kw">function</span>() {
+  window.open(url)
+}, <span class="op">1000</span>)</pre>
+        <div class="card-actions">
+          <button class="test-btn" id="btn-7a" onclick="runDelayed('7a', 1000)">Arm (fires in 1s)</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-top">
+          <span class="card-title">Delayed open (3 seconds)</span>
+          <span class="badge pending" id="badge-7b">Pending</span>
+        </div>
+        <pre class="code-snippet">setTimeout(<span class="kw">function</span>() {
+  window.open(url)
+}, <span class="op">3000</span>)</pre>
+        <div class="card-actions">
+          <button class="test-btn" id="btn-7b" onclick="runDelayed('7b', 3000)">Arm (fires in 3s)</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-top">
+          <span class="card-title">Rapid-fire loop (5 &times; 100ms)</span>
+          <span class="badge pending" id="badge-7c">Pending</span>
+        </div>
+        <pre class="code-snippet"><span class="kw">for</span> (<span class="kw">let</span> i <span class="op">=</span> <span class="op">0</span>; i <span class="op">&lt;</span> <span class="op">5</span>; i<span class="op">++</span>) {
+  setTimeout(
+    () <span class="op">=&gt;</span> window.open(url),
+    i <span class="op">*</span> <span class="op">100</span>
+  )
+}</pre>
+        <div class="card-actions">
+          <button class="test-btn" onclick="runRapidFire('7c')">Test it (&times;5)</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-top">
+          <span class="card-title">Scroll-triggered</span>
+          <span class="badge pending" id="badge-7d">Pending</span>
+        </div>
+        <pre class="code-snippet"><span class="kw">new</span> IntersectionObserver(([e]) <span class="op">=&gt;</span> {
+  <span class="kw">if</span> (e.isIntersecting)
+    window.open(url)
+}).observe(sentinel)</pre>
+        <div class="card-actions">
+          <button class="test-btn" id="btn-7d" onclick="armScrollTrigger('7d')">Arm &mdash; then scroll down</button>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================================================
+       SECTION 8: Real-World Ad Patterns
+  ============================================================ -->
+  <section class="section">
+    <div class="section-header">
+      <span class="section-icon" aria-hidden="true">&#128226;</span>
+      <span class="section-title">Real-World Ad Patterns</span>
+      <span class="section-tally" id="tally-8">0 / 3</span>
+      <button class="section-run-btn" data-section="8" onclick="runSection('8')">&#9654; Run</button>
+    </div>
+    <div class="card-grid">
+
+      <div class="card">
+        <div class="card-top">
+          <span class="card-title">Double-open: onclick + target="_blank"</span>
+          <span class="badge pending" id="badge-8a">Pending</span>
+        </div>
+        <pre class="code-snippet">&lt;<span class="kw">a</span> <span class="fn">target</span>=<span class="str">"_blank"</span>
+   <span class="fn">onclick</span>=<span class="str">"window.open(url)"</span>&gt;
+  Ad link
+&lt;/<span class="kw">a</span>&gt;</pre>
+        <div class="card-actions">
+          <button class="test-btn" onclick="runDoubleOpen('8a')">Test it</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-top">
+          <span class="card-title">Script-injected anchor + body append + click</span>
+          <span class="badge pending" id="badge-8b">Pending</span>
+        </div>
+        <pre class="code-snippet"><span class="kw">const</span> a <span class="op">=</span> document.createElement(<span class="str">'a'</span>)
+a.target <span class="op">=</span> <span class="str">'_blank'</span>
+a.href <span class="op">=</span> url
+document.body.appendChild(a)
+a.click()</pre>
+        <div class="card-actions">
+          <button class="test-btn" onclick="runAnchorAppend('8b', false)">Test it</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-top">
+          <span class="card-title">Popup with document.write redirect</span>
+          <span class="badge pending" id="badge-8c">Pending</span>
+        </div>
+        <pre class="code-snippet"><span class="kw">const</span> w <span class="op">=</span> window.open(<span class="str">''</span>)
+<span class="kw">if</span> (w) w.document.write(
+  <span class="str">'&lt;script&gt;location=url&lt;/script&gt;'</span>
+)</pre>
+        <div class="card-actions">
+          <button class="test-btn" onclick="runDocWrite('8c')">Test it</button>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+</main>
+
+<!-- Fixed summary panel -->
+<div class="summary-panel" role="status" aria-live="polite">
+  <div class="panel-stats">
+    <div class="panel-stat">
+      <span class="panel-stat-value" id="sumBlocked">0</span>
+      <span class="panel-stat-label">Blocked</span>
+    </div>
+    <div class="panel-stat">
+      <span class="panel-stat-value" id="sumOpened">0</span>
+      <span class="panel-stat-label">Opened</span>
+    </div>
+    <div class="panel-stat">
+      <span class="panel-stat-value" id="sumPending">26</span>
+      <span class="panel-stat-label">Pending</span>
+    </div>
+  </div>
+  <div class="panel-divider"></div>
+  <div class="run-split">
+    <button class="run-split-main" id="runAllBtn" onclick="runAll()">&#9654; Run All</button>
+    <button class="run-split-chevron" id="runDropBtn" onclick="toggleRunDropdown(event)">&#9660;</button>
+    <div class="run-dropdown" id="runDropdown">
+      <button class="run-dd-item dd-all" onclick="runAll(); closeDropdown()">&#9654; Run All Tests</button>
+      <div class="run-dd-sep"></div>
+      <button class="run-dd-item" onclick="runSection('1'); closeDropdown()">1 &middot; window.open()</button>
+      <button class="run-dd-item" onclick="runSection('2'); closeDropdown()">2 &middot; Location Redirects</button>
+      <button class="run-dd-item" onclick="runSection('3'); closeDropdown()">3 &middot; HTML Links</button>
+      <button class="run-dd-item" onclick="runSection('4'); closeDropdown()">4 &middot; Form Submissions</button>
+      <button class="run-dd-item" onclick="runSection('5'); closeDropdown()">5 &middot; Programmatic Clicks</button>
+      <button class="run-dd-item" onclick="runSection('6'); closeDropdown()">6 &middot; Bypass Attempts</button>
+      <button class="run-dd-item" onclick="runSection('7'); closeDropdown()">7 &middot; Timing Variants</button>
+      <button class="run-dd-item" onclick="runSection('8'); closeDropdown()">8 &middot; Ad Patterns</button>
+    </div>
+  </div>
+  <button class="panel-reset-btn" onclick="resetAll()">Reset</button>
+</div>
+
+<!-- Run-All progress overlay -->
+<div class="run-all-overlay" id="runAllOverlay">
+  <div class="run-progress-track">
+    <div class="run-progress-fill" id="runProgressFill"></div>
+  </div>
+  <div class="run-step-label" id="runStepLabel">
+    <span class="step-num" id="runStepNum"></span>
+    <span id="runStepText"></span>
+  </div>
+</div>
+
+<footer class="site-footer">
+  <a href="https://github.com/jayzeng/popup-blocker" rel="noopener">Yet Another Popup Blocker</a>
+  &mdash; open-source Chrome extension
+  &middot; Author: Jay Zeng
+  &middot; License: <a href="https://github.com/jayzeng/popup-blocker/blob/main/LICENSE" target="_blank" rel="noopener">MIT</a>
+</footer>
+
+<!-- ================================================================
+     SCRIPT
+================================================================ -->
+<script>
+(function() {
+'use strict';
+
+// ----------------------------------------------------------------
+// Constants
+// ----------------------------------------------------------------
+var TOTAL = 26; // trackable tests (3d is manual, excluded)
+var DELAY = 220; // ms to wait for postMessage events after calling test fn
+
+// ----------------------------------------------------------------
+// State
+// ----------------------------------------------------------------
+var sessionCount = 0;
+var tallies = {}; // id -> 'blocked'|'opened'
+var extensionActive = null; // null=unknown, true, false
+
+// ----------------------------------------------------------------
+// Copy buttons for code snippets
+// ----------------------------------------------------------------
+function copyTextToClipboard(text) {
+  if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+    return navigator.clipboard.writeText(text);
+  }
+
+  return new Promise(function(resolve, reject) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+
+    try {
+      var ok = document.execCommand('copy');
+      ta.remove();
+      if (ok) resolve();
+      else reject(new Error('Copy command failed'));
+    } catch (err) {
+      ta.remove();
+      reject(err);
+    }
+  });
+}
+
+function setCopyButtonState(btn, label, copied) {
+  if (!btn) return;
+  btn.textContent = label;
+  btn.classList.toggle('copied', !!copied);
+}
+
+function attachCopyButtons() {
+  document.querySelectorAll('pre.code-snippet').forEach(function(snippet) {
+    if (snippet.dataset.copyReady === '1') return;
+    snippet.dataset.copyReady = '1';
+
+    var wrap = document.createElement('div');
+    wrap.className = 'snippet-wrap';
+    snippet.parentNode.insertBefore(wrap, snippet);
+    wrap.appendChild(snippet);
+
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'copy-btn';
+    btn.setAttribute('aria-label', 'Copy code');
+    btn.textContent = 'Copy';
+
+    btn.addEventListener('click', function() {
+      var text = snippet.textContent || '';
+      copyTextToClipboard(text).then(function() {
+        setCopyButtonState(btn, 'Copied', true);
+      }).catch(function() {
+        setCopyButtonState(btn, 'Failed', false);
+      }).finally(function() {
+        clearTimeout(btn._copyResetTimer);
+        btn._copyResetTimer = setTimeout(function() {
+          setCopyButtonState(btn, 'Copy', false);
+        }, 1200);
+      });
+    });
+
+    wrap.appendChild(btn);
+  });
+}
+
+// ----------------------------------------------------------------
+// Extension detection
+// ----------------------------------------------------------------
+function detectExtension() {
+  // Probe: call window.open('about:blank'). If patched, returns null.
+  var probe;
+  try { probe = window.open('about:blank'); } catch(e) { probe = null; }
+
+  if (probe === null) {
+    extensionActive = true;
+    setStatus('active',
+      'Extension Active \u2014 Blocking Popups',
+      'All popup methods are being intercepted on this page');
+  } else {
+    extensionActive = false;
+    try { probe.close(); } catch(e) {}
+    setStatus('inactive',
+      'Extension Not Detected',
+      'Install the extension and enable blocking for this site to test');
+  }
+}
+
+function setStatus(state, text, sub) {
+  var dot  = document.getElementById('statusDot');
+  var txt  = document.getElementById('statusText');
+  var subt = document.getElementById('statusSub');
+  dot.className  = 'status-dot ' + state;
+  txt.textContent  = text;
+  subt.textContent = sub;
+}
+
+// Run detection after a short delay so the extension's injected script
+// has had time to run (it injects at document_start, but file:// can vary).
+window.addEventListener('DOMContentLoaded', function() {
+  attachCopyButtons();
+  setTimeout(detectExtension, 400);
+});
+
+// ----------------------------------------------------------------
+// Badge helpers
+// ----------------------------------------------------------------
+function badge(id) { return document.getElementById('badge-' + id); }
+
+function markBlocked(id) {
+  var el = badge(id);
+  if (!el || el.classList.contains('manual')) return;
+  el.className = 'badge blocked';
+  el.textContent = 'Blocked';
+  if (!tallies[id]) {
+    tallies[id] = 'blocked';
+    sessionCount++;
+    bumpCounter();
+    updateStats();
+    updateTally(sectionOf(id));
+    saveState();
+  }
+}
+
+function markOpened(id) {
+  var el = badge(id);
+  if (!el || el.classList.contains('manual')) return;
+  el.className = 'badge opened';
+  el.textContent = 'Opened';
+  if (!tallies[id]) {
+    tallies[id] = 'opened';
+    updateStats();
+    updateTally(sectionOf(id));
+    saveState();
+  }
+}
+
+function markTesting(id) {
+  var el = badge(id);
+  if (el) { el.className = 'badge pending'; el.textContent = 'Testing\u2026'; }
+}
+
+function sectionOf(id) { return id.charAt(0); }
+
+// ----------------------------------------------------------------
+// Stats & tallies
+// ----------------------------------------------------------------
+function bumpCounter() {
+  var el = document.getElementById('sessionCount');
+  el.textContent = sessionCount;
+  el.classList.remove('bump');
+  void el.offsetWidth;
+  el.classList.add('bump');
+}
+
+function updateStats() {
+  var blocked = 0, opened = 0;
+  for (var k in tallies) { if (tallies[k] === 'blocked') blocked++; else opened++; }
+  document.getElementById('sumBlocked').textContent = blocked;
+  document.getElementById('sumOpened').textContent  = opened;
+  document.getElementById('sumPending').textContent = TOTAL - blocked - opened;
+  document.getElementById('sessionCount').textContent = sessionCount;
+}
+
+function updateTally(sec) {
+  var el = document.getElementById('tally-' + sec);
+  if (!el) return;
+  var badges = document.querySelectorAll('[id^="badge-' + sec + '"]');
+  var b = 0, t = 0;
+  badges.forEach(function(bEl) {
+    if (bEl.classList.contains('manual')) return;
+    t++;
+    if (bEl.classList.contains('blocked')) b++;
+  });
+  el.textContent = b + ' / ' + t;
+}
+
+// ----------------------------------------------------------------
+// postMessage listener factory
+// ----------------------------------------------------------------
+function makeMessageWatcher() {
+  var fired = false;
+  var handler = function(e) {
+    if (e.source !== window || !e.data) return;
+    if (e.data.type === 'BLOCKED_POPUP' || e.data.type === 'BLOCKED_REDIRECT') {
+      fired = true;
+    }
+  };
+  window.addEventListener('message', handler);
+  return {
+    triggered: function() { return fired; },
+    stop: function() { window.removeEventListener('message', handler); }
+  };
+}
+
+// ----------------------------------------------------------------
+// Core test runners
+// ----------------------------------------------------------------
+
+// For window.open — detects via null return value + postMessage
+function runOpen(id, fn) {
+  markTesting(id);
+  var watcher = makeMessageWatcher();
+  var result;
+  try { result = fn(); } catch(e) { result = null; }
+  setTimeout(function() {
+    watcher.stop();
+    if (result === null || watcher.triggered()) {
+      markBlocked(id);
+    } else {
+      markOpened(id);
+      if (result && typeof result.close === 'function') {
+        try { result.close(); } catch(e) {}
+      }
+    }
+  }, DELAY);
+}
+
+// For location methods — detects via BLOCKED_REDIRECT postMessage
+// Falls back to extensionActive flag (since if not blocked, page navigates away)
+function runMsg(id, fn) {
+  markTesting(id);
+
+  // Guard: if the extension is not active these methods will actually navigate
+  // the page away, losing all state. Only fire the real call when we know
+  // block_popups.js has patched them; otherwise just report "Opened".
+  if (extensionActive !== true) {
+    setTimeout(function() { markOpened(id); }, DELAY);
+    return;
+  }
+
+  var watcher = makeMessageWatcher();
+  try { fn(); } catch(e) {}
+  setTimeout(function() {
+    watcher.stop();
+    if (watcher.triggered()) {
+      markBlocked(id);
+    } else {
+      markOpened(id);
+    }
+  }, DELAY);
+}
+
+// For HTMLAnchorElement.prototype.click() — triggers BLOCKED_POPUP postMessage
+function runAnchor(id, url) {
+  markTesting(id);
+  var watcher = makeMessageWatcher();
+  var a = document.createElement('a');
+  a.href = url;
+  a.target = '_blank';
+  document.body.appendChild(a);
+  try { a.click(); } catch(e) {}
+  a.remove();
+  setTimeout(function() {
+    watcher.stop();
+    if (watcher.triggered()) {
+      markBlocked(id);
+    } else {
+      markOpened(id);
+    }
+  }, DELAY);
+}
+
+// Anchor with nested element
+function runAnchorNested(id) {
+  markTesting(id);
+  var watcher = makeMessageWatcher();
+  var a = document.createElement('a');
+  a.href = 'https://example.com';
+  a.target = '_blank';
+  var span = document.createElement('span');
+  span.textContent = 'nested content';
+  a.appendChild(span);
+  document.body.appendChild(a);
+  try { a.click(); } catch(e) {}
+  a.remove();
+  setTimeout(function() {
+    watcher.stop();
+    if (watcher.triggered()) {
+      markBlocked(id);
+    } else {
+      markOpened(id);
+    }
+  }, DELAY);
+}
+
+// Appended anchor + click (Sections 5 & 8b)
+function runAnchorAppend(id, hidden) {
+  markTesting(id);
+  var watcher = makeMessageWatcher();
+  var a = document.createElement('a');
+  a.href = 'https://example.com';
+  a.target = '_blank';
+  if (hidden) a.style.display = 'none';
+  document.body.appendChild(a);
+  try { a.click(); } catch(e) {}
+  a.remove();
+  setTimeout(function() {
+    watcher.stop();
+    if (watcher.triggered()) {
+      markBlocked(id);
+    } else {
+      markOpened(id);
+    }
+  }, DELAY);
+}
+
+// Form: click the hidden submit button (fires submit event → content script)
+function runForm(id) {
+  markTesting(id);
+  var form = document.getElementById('form-' + id);
+  if (!form) return;
+
+  var blocked = false;
+  var submitted = false;
+  var submitHandler = function(e) {
+    submitted = true;
+    if (e.defaultPrevented) blocked = true;
+  };
+  form.addEventListener('submit', submitHandler);
+
+  var btn = document.getElementById('submit-' + id);
+  if (btn) {
+    try { btn.click(); } catch(e) {}
+  } else {
+    try { form.requestSubmit(); } catch(e) { try { form.submit(); } catch(e2) {} }
+  }
+
+  setTimeout(function() {
+    form.removeEventListener('submit', submitHandler);
+    if (blocked || (submitted && extensionActive)) {
+      markBlocked(id);
+    } else if (submitted) {
+      markOpened(id);
+    } else {
+      markOpened(id); // no submit event fired at all
+    }
+  }, DELAY);
+}
+
+// Form: simulate Enter key via requestSubmit
+function runFormEnter(id) {
+  markTesting(id);
+  var form = document.getElementById('form-' + id);
+  if (!form) return;
+
+  var blocked = false;
+  var submitted = false;
+  var submitHandler = function(e) {
+    submitted = true;
+    if (e.defaultPrevented) blocked = true;
+  };
+  form.addEventListener('submit', submitHandler);
+
+  // requestSubmit fires the submit event (unlike form.submit())
+  try { form.requestSubmit(); } catch(e) {
+    // Fallback for older browsers: click a programmatic submit button
+    var tmp = document.createElement('button');
+    tmp.type = 'submit';
+    form.appendChild(tmp);
+    try { tmp.click(); } catch(e2) {}
+    tmp.remove();
+  }
+
+  setTimeout(function() {
+    form.removeEventListener('submit', submitHandler);
+    if (blocked || (submitted && extensionActive)) {
+      markBlocked(id);
+    } else {
+      markOpened(id);
+    }
+  }, DELAY);
+}
+
+// form.submit() — bypasses submit event; background catches the new tab
+function runFormDotSubmit(id) {
+  markTesting(id);
+  var form = document.getElementById('form-' + id);
+  if (!form) return;
+
+  // form.submit() doesn't fire a submit event, so we can't detect via content script.
+  // We detect by checking if the extension is active (background closes the tab).
+  // Open a probe first so we know extension state.
+  var probe;
+  try { probe = window.open('about:blank'); } catch(e) { probe = null; }
+
+  if (probe === null) {
+    // Extension is active — form.submit() popup will be closed by background
+    try { form.submit(); } catch(e) {}
+    markBlocked(id);
+  } else {
+    try { if (probe) probe.close(); } catch(e) {}
+    try { form.submit(); } catch(e) {}
+    markOpened(id);
+  }
+  updateStats();
+}
+
+// Bypass: try to reassign window.open (writable:false blocks it)
+function runReassignTest(id) {
+  markTesting(id);
+  var watcher = makeMessageWatcher();
+
+  // Try to overwrite — should fail silently (writable:false, non-strict) or throw (strict)
+  try { window.open = function() { return 'bypassed'; }; } catch(e) {}
+
+  var result;
+  try { result = window.open('https://example.com'); } catch(e) { result = null; }
+
+  // Also wait past the 500ms re-protection interval
+  setTimeout(function() {
+    watcher.stop();
+    if (result === null || watcher.triggered()) {
+      markBlocked(id);
+    } else {
+      markOpened(id);
+      if (result && typeof result.close === 'function') {
+        try { result.close(); } catch(e) {}
+      }
+    }
+  }, 600);
+}
+
+// Bypass: try Object.defineProperty override
+function runDefinePropertyTest(id) {
+  markTesting(id);
+  var watcher = makeMessageWatcher();
+
+  try {
+    Object.defineProperty(window, 'open', {
+      value: function() { return 'bypassed'; },
+      writable: true,
+      configurable: true
+    });
+  } catch(e) {
+    // Expected: extension sets writable:false on 'open', so redefining throws
+  }
+
+  var result;
+  try { result = window.open('https://example.com'); } catch(e) { result = null; }
+
+  setTimeout(function() {
+    watcher.stop();
+    // 'bypassed' string means our custom fn ran — extension missed the override
+    if (result === null || watcher.triggered()) {
+      markBlocked(id);
+    } else {
+      markOpened(id);
+      if (result && typeof result.close === 'function') {
+        try { result.close(); } catch(e) {}
+      }
+    }
+  }, DELAY);
+}
+
+// Timing: delayed window.open
+function runDelayed(id, delayMs) {
+  var btn = document.getElementById('btn-' + id);
+  if (btn) btn.disabled = true;
+
+  var remaining = Math.ceil(delayMs / 1000);
+  markTesting(id);
+  badge(id).textContent = 'Fires in ' + remaining + 's\u2026';
+
+  var ticker = setInterval(function() {
+    remaining--;
+    if (remaining > 0) {
+      badge(id).textContent = 'Fires in ' + remaining + 's\u2026';
+    } else {
+      clearInterval(ticker);
+    }
+  }, 1000);
+
+  setTimeout(function() {
+    clearInterval(ticker);
+    var watcher = makeMessageWatcher();
+    var result;
+    try { result = window.open('https://example.com'); } catch(e) { result = null; }
+    setTimeout(function() {
+      watcher.stop();
+      if (btn) btn.disabled = false;
+      if (result === null || watcher.triggered()) {
+        markBlocked(id);
+      } else {
+        markOpened(id);
+        if (result && typeof result.close === 'function') {
+          try { result.close(); } catch(e) {}
+        }
+      }
+    }, DELAY);
+  }, delayMs);
+}
+
+// Timing: rapid-fire 5 popups
+function runRapidFire(id) {
+  markTesting(id);
+  badge(id).textContent = 'Firing\u2026';
+
+  var results = [];
+  var watcher = makeMessageWatcher();
+
+  for (var i = 0; i < 5; i++) {
+    (function(idx) {
+      setTimeout(function() {
+        var r;
+        try { r = window.open('https://example.com'); } catch(e) { r = null; }
+        results.push(r);
+        if (r && r.close) { try { r.close(); } catch(e) {} }
+      }, idx * 100);
+    })(i);
+  }
+
+  setTimeout(function() {
+    watcher.stop();
+    var nullCount = results.filter(function(r) { return r === null; }).length;
+    var msgCount  = watcher.triggered() ? 1 : 0; // approximate; at least one fired
+    if (nullCount === 5 || (nullCount > 0 && nullCount === results.length)) {
+      var el = badge(id);
+      el.className = 'badge blocked';
+      el.textContent = nullCount + '/5 Blocked';
+      if (!tallies[id]) {
+        tallies[id] = 'blocked';
+        sessionCount += nullCount;
+        document.getElementById('sessionCount').textContent = sessionCount;
+        updateStats();
+        updateTally(sectionOf(id));
+      }
+    } else if (nullCount > 0) {
+      var elp = badge(id);
+      elp.className = 'badge blocked';
+      elp.textContent = nullCount + '/5 Blocked';
+      if (!tallies[id]) {
+        tallies[id] = 'blocked';
+        sessionCount += nullCount;
+        document.getElementById('sessionCount').textContent = sessionCount;
+        updateStats();
+        updateTally(sectionOf(id));
+      }
+    } else {
+      markOpened(id);
+    }
+  }, 700);
+}
+
+// Timing: scroll-triggered
+var scrollArmed = false;
+function armScrollTrigger(id) {
+  if (scrollArmed) return;
+  scrollArmed = true;
+
+  var btn = document.getElementById('btn-' + id);
+  if (btn) { btn.textContent = 'Armed \u2014 scroll to footer'; btn.disabled = true; }
+  badge(id).className = 'badge pending';
+  badge(id).textContent = 'Watching\u2026';
+
+  // Observe the footer sentinel
+  var sentinel = document.querySelector('.site-footer');
+  if (!sentinel) return;
+
+  var observer = new IntersectionObserver(function(entries) {
+    if (!entries[0].isIntersecting) return;
+    observer.disconnect();
+
+    var watcher = makeMessageWatcher();
+    var result;
+    try { result = window.open('https://example.com'); } catch(e) { result = null; }
+    setTimeout(function() {
+      watcher.stop();
+      if (result === null || watcher.triggered()) {
+        markBlocked(id);
+      } else {
+        markOpened(id);
+        if (result && typeof result.close === 'function') {
+          try { result.close(); } catch(e) {}
+        }
+      }
+    }, DELAY);
+  }, { threshold: 0.1 });
+
+  observer.observe(sentinel);
+}
+
+// Ad: double-open pattern
+function runDoubleOpen(id) {
+  markTesting(id);
+  var watcher = makeMessageWatcher();
+
+  // Pattern: onclick fires window.open AND link has target="_blank"
+  var r1;
+  try { r1 = window.open('https://example.com'); } catch(e) { r1 = null; }
+
+  // Simulate the link click (second vector)
+  var a = document.createElement('a');
+  a.href = 'https://example.com';
+  a.target = '_blank';
+  document.body.appendChild(a);
+  try { a.click(); } catch(e) {}
+  a.remove();
+
+  setTimeout(function() {
+    watcher.stop();
+    if (r1 === null || watcher.triggered()) {
+      markBlocked(id);
+    } else {
+      markOpened(id);
+      if (r1 && typeof r1.close === 'function') { try { r1.close(); } catch(e) {} }
+    }
+  }, DELAY);
+}
+
+// Ad: document.write redirect
+function runDocWrite(id) {
+  markTesting(id);
+  var watcher = makeMessageWatcher();
+  var result;
+  try { result = window.open(''); } catch(e) { result = null; }
+  if (result) {
+    try {
+      result.document.write('<script>location="https://example.com"<\/script>');
+    } catch(e) {}
+  }
+  setTimeout(function() {
+    watcher.stop();
+    if (result === null || watcher.triggered()) {
+      markBlocked(id);
+    } else {
+      markOpened(id);
+      if (result && typeof result.close === 'function') {
+        try { result.close(); } catch(e) {}
+      }
+    }
+  }, DELAY);
+}
+
+// ----------------------------------------------------------------
+// Run All Tests
+// ----------------------------------------------------------------
+var runAllActive = false;
+
+// Each entry: { id, label, run[, wait] }
+// `wait` overrides the default settle time for tests with internal timers.
+var RUN_ALL_QUEUE = [
+  { id: '1a', label: 'window.open basic',                 run: function() { runOpen('1a', function(){ return window.open('https://example.com'); }); } },
+  { id: '1b', label: 'window.open with features',         run: function() { runOpen('1b', function(){ return window.open('https://example.com','_blank','width=400,height=300'); }); } },
+  { id: '1c', label: 'window.open empty URL',             run: function() { runOpen('1c', function(){ return window.open(''); }); } },
+  { id: '1d', label: 'window.open stored reference',      run: function() { runOpen('1d', function(){ var o=window.open; return o('https://example.com'); }); } },
+  { id: '2a', label: 'location.assign()',                 run: function() { runMsg('2a', function(){ location.assign('https://example.com'); }); } },
+  { id: '2b', label: 'location.replace()',                run: function() { runMsg('2b', function(){ location.replace('https://example.com'); }); } },
+  { id: '2c', label: 'location.reload()',                 run: function() { runMsg('2c', function(){ location.reload(); }); } },
+  { id: '3a', label: 'anchor click (standard)',           run: function() { runAnchor('3a', 'https://example.com'); } },
+  { id: '3b', label: 'anchor click (nested element)',     run: function() { runAnchorNested('3b'); } },
+  { id: '3c', label: 'anchor click (script-created)',     run: function() { runAnchor('3c', 'https://example.com'); } },
+  { id: '4a', label: 'form submit button',                run: function() { runForm('4a'); } },
+  { id: '4b', label: 'form Enter key',                    run: function() { runFormEnter('4b'); } },
+  { id: '4c', label: 'form.submit() programmatic',        run: function() { runFormDotSubmit('4c'); } },
+  { id: '5a', label: 'appended anchor + click()',         run: function() { runAnchorAppend('5a', false); } },
+  { id: '5b', label: 'hidden anchor + click()',           run: function() { runAnchorAppend('5b', true); } },
+  { id: '6a', label: 'bypass: stored reference',         run: function() { runOpen('6a', function(){ var o=window.open; return o('https://example.com'); }); } },
+  { id: '6b', label: 'bypass: reassign window.open',     run: function() { runReassignTest('6b'); }, wait: 700 },
+  { id: '6c', label: 'bypass: Object.defineProperty',    run: function() { runDefinePropertyTest('6c'); } },
+  { id: '6d', label: 'bypass: IIFE with window alias',   run: function() { runOpen('6d', function(){ return (function(w){ return w.open('https://example.com'); })(window); }); } },
+  // Timing variants: run immediately (skip countdown/scroll arm in run-all mode)
+  { id: '7a', label: 'timing: delayed (running now)',    run: function() { runOpen('7a', function(){ return window.open('https://example.com'); }); } },
+  { id: '7b', label: 'timing: delayed (running now)',    run: function() { runOpen('7b', function(){ return window.open('https://example.com'); }); } },
+  { id: '7c', label: 'timing: rapid-fire \u00d75',      run: function() { runRapidFire('7c'); }, wait: 800 },
+  { id: '7d', label: 'timing: scroll-triggered (now)',   run: function() { runOpen('7d', function(){ return window.open('https://example.com'); }); } },
+  { id: '8a', label: 'ad: double-open pattern',          run: function() { runDoubleOpen('8a'); } },
+  { id: '8b', label: 'ad: script-injected anchor',       run: function() { runAnchorAppend('8b', false); } },
+  { id: '8c', label: 'ad: document.write redirect',      run: function() { runDocWrite('8c'); } }
+];
+
+// Shared step engine used by both runAll and runSection.
+// items  — array of queue entries to run
+// index  — current position
+// onDone — called when the last item finishes (or run is stopped)
+function runQueueStep(items, index, onDone) {
+  if (!runAllActive || index >= items.length) {
+    if (typeof onDone === 'function') onDone();
+    return;
+  }
+
+  var item   = items[index];
+  var total  = items.length;
+  var settle = item.wait || (DELAY + 80);
+
+  // Update progress overlay
+  var fill = document.getElementById('runProgressFill');
+  var num  = document.getElementById('runStepNum');
+  var txt  = document.getElementById('runStepText');
+  if (fill) fill.style.width = ((index / total) * 100) + '%';
+  if (num)  num.textContent  = (index + 1) + ' / ' + total;
+  if (txt)  txt.textContent  = item.label;
+
+  // Spotlight the card
+  var badgeEl = badge(item.id);
+  var card    = badgeEl ? badgeEl.closest('.card') : null;
+  if (card) {
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    card.classList.add('running');
+  }
+
+  // Let scroll settle, fire test, then advance
+  setTimeout(function() {
+    if (!runAllActive) { if (card) card.classList.remove('running'); return; }
+    item.run();
+    setTimeout(function() {
+      if (card) card.classList.remove('running');
+      setTimeout(function() { runQueueStep(items, index + 1, onDone); }, 120);
+    }, settle);
+  }, 380);
+}
+
+function setAllRunBtnsDisabled(state) {
+  document.querySelectorAll('.section-run-btn').forEach(function(b) { b.disabled = state; });
+  ['runAllBtn', 'runDropBtn'].forEach(function(id) {
+    var b = document.getElementById(id);
+    if (b) b.disabled = state;
+  });
+}
+
+function toggleRunDropdown(e) {
+  e.stopPropagation();
+  document.getElementById('runDropdown').classList.toggle('open');
+}
+
+function closeDropdown() {
+  var dd = document.getElementById('runDropdown');
+  if (dd) dd.classList.remove('open');
+}
+
+document.addEventListener('click', closeDropdown);
+
+function runAll() {
+  if (runAllActive) return;
+  resetAll();
+  setTimeout(function() {
+    runAllActive = true;
+    setAllRunBtnsDisabled(true);
+    showRunOverlay();
+    runQueueStep(RUN_ALL_QUEUE, 0, finishRunAll);
+  }, 100);
+}
+
+function finishRunAll() {
+  runAllActive = false;
+  var fill = document.getElementById('runProgressFill');
+  var num  = document.getElementById('runStepNum');
+  var txt  = document.getElementById('runStepText');
+  if (fill) fill.style.width = '100%';
+  if (num)  num.textContent  = RUN_ALL_QUEUE.length + ' / ' + RUN_ALL_QUEUE.length;
+  if (txt)  txt.textContent  = 'Done!';
+  setTimeout(hideRunOverlay, 1200);
+  setAllRunBtnsDisabled(false);
+}
+
+function runSection(sec) {
+  if (runAllActive) return;
+
+  var items = RUN_ALL_QUEUE.filter(function(item) { return item.id.charAt(0) === sec; });
+  if (!items.length) return;
+
+  // Reset only this section's badges and tallies
+  items.forEach(function(item) {
+    if (tallies[item.id] === 'blocked') sessionCount = Math.max(0, sessionCount - 1);
+    delete tallies[item.id];
+    var el = badge(item.id);
+    if (el && !el.classList.contains('manual')) {
+      el.className = 'badge pending';
+      el.textContent = 'Pending';
+    }
+  });
+  updateStats();
+  updateTally(sec);
+
+  runAllActive = true;
+  setAllRunBtnsDisabled(true);
+  showRunOverlay();
+
+  runQueueStep(items, 0, function() {
+    runAllActive = false;
+    setAllRunBtnsDisabled(false);
+    var fill = document.getElementById('runProgressFill');
+    var num  = document.getElementById('runStepNum');
+    var txt  = document.getElementById('runStepText');
+    if (fill) fill.style.width = '100%';
+    if (num)  num.textContent  = items.length + ' / ' + items.length;
+    if (txt)  txt.textContent  = 'Done!';
+    setTimeout(hideRunOverlay, 1200);
+  });
+}
+
+function showRunOverlay() {
+  var el = document.getElementById('runAllOverlay');
+  if (el) el.classList.add('active');
+}
+
+function hideRunOverlay() {
+  var el = document.getElementById('runAllOverlay');
+  if (el) el.classList.remove('active');
+  var fill = document.getElementById('runProgressFill');
+  if (fill) fill.style.width = '0%';
+}
+
+// ----------------------------------------------------------------
+// Reset
+// ----------------------------------------------------------------
+function saveState() {
+  try {
+    sessionStorage.setItem('qa_tallies', JSON.stringify(tallies));
+    sessionStorage.setItem('qa_sessionCount', String(sessionCount));
+  } catch(e) {}
+}
+
+function restoreState() {
+  try {
+    var t = sessionStorage.getItem('qa_tallies');
+    var c = sessionStorage.getItem('qa_sessionCount');
+    if (t) {
+      tallies = JSON.parse(t);
+      for (var id in tallies) {
+        var el = badge(id);
+        if (!el) continue;
+        if (tallies[id] === 'blocked') { el.className = 'badge blocked'; el.textContent = 'Blocked'; }
+        else                           { el.className = 'badge opened';  el.textContent = 'Opened'; }
+      }
+    }
+    if (c) sessionCount = parseInt(c, 10) || 0;
+  } catch(e) {}
+  updateStats();
+  ['1','2','3','4','5','6','7','8'].forEach(function(s) { updateTally(s); });
+}
+
+function resetAll() {
+  // Stop any running sequence
+  if (runAllActive) {
+    runAllActive = false;
+    document.querySelectorAll('.card.running').forEach(function(c) { c.classList.remove('running'); });
+    hideRunOverlay();
+    setAllRunBtnsDisabled(false);
+  }
+  tallies = {};
+  sessionCount = 0;
+  scrollArmed = false;
+  try { sessionStorage.removeItem('qa_tallies'); sessionStorage.removeItem('qa_sessionCount'); } catch(e) {}
+
+  document.querySelectorAll('.badge:not(.manual)').forEach(function(el) {
+    el.className = 'badge pending';
+    el.textContent = 'Pending';
+  });
+  ['7a','7b','7d'].forEach(function(id) {
+    var btn = document.getElementById('btn-' + id);
+    if (btn) {
+      btn.disabled = false;
+      if (id === '7a') btn.textContent = 'Arm (fires in 1s)';
+      if (id === '7b') btn.textContent = 'Arm (fires in 3s)';
+      if (id === '7d') btn.textContent = 'Arm \u2014 then scroll down';
+    }
+  });
+
+  document.getElementById('sumBlocked').textContent = '0';
+  document.getElementById('sumOpened').textContent  = '0';
+  document.getElementById('sumPending').textContent = TOTAL;
+  document.getElementById('sessionCount').textContent = '0';
+
+  ['1','2','3','4','5','6','7','8'].forEach(function(s) { updateTally(s); });
+}
+
+// Restore any results saved from a previous/interrupted session
+restoreState();
+
+// Expose for inline onclick handlers
+window.runOpen             = runOpen;
+window.runMsg              = runMsg;
+window.runAnchor           = runAnchor;
+window.runAnchorNested     = runAnchorNested;
+window.runAnchorAppend     = runAnchorAppend;
+window.runForm             = runForm;
+window.runFormEnter        = runFormEnter;
+window.runFormDotSubmit    = runFormDotSubmit;
+window.runReassignTest     = runReassignTest;
+window.runDefinePropertyTest = runDefinePropertyTest;
+window.runDelayed          = runDelayed;
+window.runRapidFire        = runRapidFire;
+window.armScrollTrigger    = armScrollTrigger;
+window.runDoubleOpen       = runDoubleOpen;
+window.runDocWrite         = runDocWrite;
+window.resetAll            = resetAll;
+window.runAll              = runAll;
+window.runSection          = runSection;
+window.toggleRunDropdown   = toggleRunDropdown;
+window.closeDropdown       = closeDropdown;
+
+})();
+</script>
+
+</body>
+</html>
