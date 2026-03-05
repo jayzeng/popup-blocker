@@ -1,22 +1,15 @@
 module.exports = {
-  parser: '@typescript-eslint/parser',
-  extends: [
-    'plugin:@typescript-eslint/recommended',
-    'plugin:react/recommended',
-  ],
+  env: {
+    browser: true,
+    node: true,
+    es2021: true,
+    jest: true,
+    webextensions: true,
+  },
+  extends: ['eslint:recommended'],
   parserOptions: {
-    ecmaVersion: 2020,
-    sourceType: 'module',
-    ecmaFeatures: {
-      jsx: true,
-    },
+    ecmaVersion: 'latest',
+    sourceType: 'script',
   },
-  rules: {
-    // Add custom rules here
-  },
-  settings: {
-    react: {
-      version: 'detect',
-    },
-  },
+  rules: {},
 };

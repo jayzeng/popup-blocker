@@ -25,28 +25,27 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Bump package and manifest version
+      - name: Bump manifest/package version
         id: version
         run: |
           VERSION=$(node - <<'NODE'
           const fs = require('fs');
-          
-          const packagePath = 'package.json';
-          const manifestPath = 'public/manifest.json';
-          
-          const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf-8'));
-          const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
-          
-          const [major, minor, patch] = packageJson.version.split('.').map(Number);
-          const nextVersion = `${major}.${minor}.${patch + 1}`;
-          
-          packageJson.version = nextVersion;
-          manifest.version = nextVersion;
-          
-          fs.writeFileSync(packagePath, JSON.stringify(packageJson, null, 2) + '\n');
+          const pkgPath = 'package.json';
+          const manifestPath = 'manifest.json';
+
+          const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+          const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+
+          const [major, minor, patch] = pkg.version.split('.').map(Number);
+          const next = `${major}.${minor}.${patch + 1}`;
+
+          pkg.version = next;
+          manifest.version = next;
+
+          fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
           fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
-          
-          console.log(nextVersion);
+
+          console.log(next);
           NODE
           )
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
@@ -57,14 +56,11 @@ jobs:
       - name: Test
         run: npm test -- --runInBand
 
-      - name: Build
-        run: npm run build
-
       - name: Commit version bump
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package.json public/manifest.json
+          git add package.json manifest.json
           git commit -m "Release v${{ steps.version.outputs.version }}"
           git push origin HEAD
 
@@ -82,7 +78,15 @@ jobs:
         id: package
         run: |
           ZIP_NAME="yet-another-popup-blocker-v${{ steps.version.outputs.version }}.zip"
-          (cd dist && zip -r "../$ZIP_NAME" .)
+          zip -r "$ZIP_NAME" \
+            background.js \
+            content.js \
+            block_popups.js \
+            unblock_popups.js \
+            manifest.json \
+            popup \
+            icons \
+            README.md
           echo "zip_name=$ZIP_NAME" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub release

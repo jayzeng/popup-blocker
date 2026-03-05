@@ -16,7 +16,7 @@
         value: originals.open,
       });
     } catch (e) {
-      try { window.open = originals.open; } catch (e2) {}
+      try { window.open = originals.open; } catch (e2) { void e2; }
     }
 
     if (originals.showModalDialog) {
@@ -28,7 +28,7 @@
           value: originals.showModalDialog,
         });
       } catch (e) {
-        try { window.showModalDialog = originals.showModalDialog; } catch (e2) {}
+        try { window.showModalDialog = originals.showModalDialog; } catch (e2) { void e2; }
       }
     }
 

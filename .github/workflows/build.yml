@@ -7,7 +7,7 @@ on:
   pull_request:
 
 jobs:
-  test-and-build:
+  test:
     runs-on: ubuntu-latest
 
     steps:
@@ -28,12 +28,3 @@ jobs:
 
       - name: Test
         run: npm test -- --runInBand
-
-      - name: Build
-        run: npm run build
-
-      - name: Upload dist artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: extension-dist
-          path: dist

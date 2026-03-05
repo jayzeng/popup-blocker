@@ -27,7 +27,7 @@
       });
     } catch (e) {
       // Fallback: simple assignment if defineProperty fails (e.g. already non-configurable)
-      try { window[methodName] = blocker; } catch (e2) {}
+      try { window[methodName] = blocker; } catch (e2) { void e2; }
     }
   }
 

@@ -2,44 +2,20 @@
   "name": "yet-another-popup-blocker",
   "version": "1.0.0",
   "description": "A simple popup blocker Chrome extension with per-site activation and incognito mode support",
-  "main": "index.js",
+  "private": true,
   "scripts": {
-    "build": "webpack --config webpack.config.js",
-    "dev": "webpack --config webpack.config.js --watch",
     "test": "jest",
-    "lint": "eslint . --ext .ts,.tsx"
+    "lint": "eslint . --ext .js"
   },
   "keywords": [
     "chrome",
     "extension",
-    "adblocker",
-    "typescript"
+    "popup-blocker"
   ],
-  "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@types/chrome": "^0.0.188",
-    "@types/jest": "^27.5.1",
-    "@types/react": "^18.3.5",
-    "@types/react-dom": "^18.3.0",
-    "@typescript-eslint/eslint-plugin": "^5.26.0",
-    "@typescript-eslint/parser": "^5.26.0",
-    "copy-webpack-plugin": "^11.0.0",
-    "css-loader": "^7.1.2",
     "eslint": "^8.16.0",
-    "eslint-plugin-react": "^7.37.5",
     "jest": "^28.1.0",
-    "jest-environment-jsdom": "^29.7.0",
-    "prettier": "^2.6.2",
-    "style-loader": "^4.0.0",
-    "ts-jest": "^28.0.3",
-    "ts-loader": "^9.5.1",
-    "typescript": "^4.7.2",
-    "webpack": "^5.94.0",
-    "webpack-cli": "^4.10.0"
-  },
-  "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "jest-environment-jsdom": "^29.7.0"
   }
 }

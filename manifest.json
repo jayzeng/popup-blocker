@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Yet Another Popup Blocker",
-  "version": "1.0",
+  "version": "1.0.0",
   "description": "A simple popup blocker with per-site activation and incognito mode support",
   "permissions": [
     "activeTab",
@@ -31,13 +31,12 @@
     }
   ],
   "action": {
-    "default_popup": "popup.html"
+    "default_popup": "popup/popup.html"
   },
   "icons": {
-    "16": "images/favicon-16x16.png",
-    "32": "images/favicon-32x32.png",
-    "48": "images/favicon-32x32.png",
-    "128": "images/favicon-150x150.png"
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
   },
   "incognito": "split"
 }

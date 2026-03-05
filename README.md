@@ -2,60 +2,49 @@
 
 Chrome extension that blocks popup windows and `_blank`-based popups on a per-site basis.
 
-## Features
+## Layout (No Build)
 
-- Per-site toggle for popup blocking
-- Counter for blocked popup attempts per site
-- Incognito masking support for blocked hostnames
-- Runtime-safe background state hydration from `chrome.storage.local`
-- Type-safe message contracts between background/content/popup
+This repository is unpacked-extension first, similar to `urlblocker`:
 
-## Architecture
+- `manifest.json`
+- `background.js`
+- `content.js`
+- `block_popups.js` / `unblock_popups.js`
+- `popup/popup.html`, `popup/popup.css`, `popup/popup.js`
+- `icons/`
 
-- `background`: source of truth for blocked sites and counters; handles runtime messages and popup window interception.
-- `content`: intercepts popup attempts in page context and reports counts.
-- `popup`: React UI for toggling current site and managing blocked list.
-- Shared contracts/utilities:
-  - `src/types.ts` for message/state interfaces
-  - `src/shared/message-validation.ts` for runtime message guards
-  - `src/shared/site-utils.ts` for hostname normalization/masking/state sanitization
+No webpack, no TypeScript compile step, no `dist` build output required.
 
-## Development
+## Local Development
 
-### Prerequisites
-
-- Node.js 18+
-- npm
-- Google Chrome
-
-### Install and build
+1. Install dev dependencies:
 
 ```bash
 npm ci
-npm run build
 ```
 
-### Run tests and lint
+2. Run checks:
 
 ```bash
 npm run lint
 npm test
 ```
 
-### Watch mode
+3. Load extension in Chrome:
 
-```bash
-npm run dev
-```
+- Open `chrome://extensions`
+- Enable Developer mode
+- Click **Load unpacked**
+- Select this repository root
 
-## Load in Chrome
+After code changes, click Reload on the extension card.
 
-1. Open `chrome://extensions`
-2. Enable **Developer mode**
-3. Click **Load unpacked**
-4. Select the `dist` directory
+## Release Flow
 
-## CI and releases
+The `Release` GitHub workflow:
 
-- `CI` workflow runs `lint`, `test`, and `build` on pushes to `main` and pull requests.
-- `Release` workflow (manual) bumps `package.json` and `public/manifest.json`, tags `vX.Y.Z`, builds, zips `dist`, and publishes a GitHub release artifact.
+- bumps `package.json` + `manifest.json` patch version
+- runs lint/tests
+- tags `vX.Y.Z`
+- zips extension source files
+- attaches zip to GitHub Release
