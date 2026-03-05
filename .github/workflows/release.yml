@@ -1,0 +1,92 @@
+name: Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Bump package and manifest version
+        id: version
+        run: |
+          VERSION=$(node - <<'NODE'
+          const fs = require('fs');
+          
+          const packagePath = 'package.json';
+          const manifestPath = 'public/manifest.json';
+          
+          const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf-8'));
+          const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+          
+          const [major, minor, patch] = packageJson.version.split('.').map(Number);
+          const nextVersion = `${major}.${minor}.${patch + 1}`;
+          
+          packageJson.version = nextVersion;
+          manifest.version = nextVersion;
+          
+          fs.writeFileSync(packagePath, JSON.stringify(packageJson, null, 2) + '\n');
+          fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
+          
+          console.log(nextVersion);
+          NODE
+          )
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test -- --runInBand
+
+      - name: Build
+        run: npm run build
+
+      - name: Commit version bump
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json public/manifest.json
+          git commit -m "Release v${{ steps.version.outputs.version }}"
+          git push origin HEAD
+
+      - name: Create tag
+        run: |
+          TAG="v${{ steps.version.outputs.version }}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists"
+            exit 1
+          fi
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin "$TAG"
+
+      - name: Package extension
+        id: package
+        run: |
+          ZIP_NAME="yet-another-popup-blocker-v${{ steps.version.outputs.version }}.zip"
+          (cd dist && zip -r "../$ZIP_NAME" .)
+          echo "zip_name=$ZIP_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          files: ${{ steps.package.outputs.zip_name }}

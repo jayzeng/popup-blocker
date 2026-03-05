@@ -1,7 +1,30 @@
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { MessageType, MessagePayload, BlockedSite } from '../types';
+import {
+  BlockedSite,
+  GetBlockedSitesRequest,
+  GetBlockingStatusRequest,
+  GetBlockingStatusResponse,
+  MessageType,
+  ToggleBlockingRequest,
+  ToggleBlockingResponse,
+  UnblockSiteRequest,
+  UnblockSiteResponse,
+} from '../types';
+import { maskHostname } from '../shared/site-utils';
 import './styles.css';
+
+function sendMessage<Request, Response>(message: Request): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage(message, (response: Response) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+      resolve(response);
+    });
+  });
+}
 
 const Popup: React.FC = () => {
   const [hostname, setHostname] = useState<string>('');
@@ -12,90 +35,85 @@ const Popup: React.FC = () => {
   const [unmaskedSites, setUnmaskedSites] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0]?.url) {
-        const url = new URL(tabs[0].url);
+    async function loadState(): Promise<void> {
+      try {
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        const activeTab = tabs[0];
+        if (!activeTab?.url) {
+          return;
+        }
+
+        const url = new URL(activeTab.url);
         setHostname(url.hostname);
 
-        // Check if the current window is incognito
-        chrome.windows.get(tabs[0].windowId, (window) => {
-          setIsIncognito(window.incognito);
-        });
+        const currentWindow = await chrome.windows.get(activeTab.windowId);
+        setIsIncognito(currentWindow.incognito);
 
-        chrome.runtime.sendMessage(
-          { type: MessageType.GET_BLOCKING_STATUS, data: { hostname: url.hostname } } as MessagePayload,
-          (response) => {
-            setIsBlocked(response.isBlocked);
-            setBlockedCount(response.blockedCount);
-          }
-        );
+        const statusRequest: GetBlockingStatusRequest = {
+          type: MessageType.GET_BLOCKING_STATUS,
+          data: { hostname: url.hostname },
+        };
 
-        // Fetch blocked sites
-        chrome.runtime.sendMessage({ type: MessageType.GET_BLOCKED_SITES }, (response: BlockedSite[]) => {
-          setBlockedSites(response);
-        });
+        const status = await sendMessage<GetBlockingStatusRequest, GetBlockingStatusResponse>(statusRequest);
+        setIsBlocked(status.isBlocked);
+        setBlockedCount(status.blockedCount);
+
+        const blockedSitesRequest: GetBlockedSitesRequest = { type: MessageType.GET_BLOCKED_SITES };
+        const sites = await sendMessage<GetBlockedSitesRequest, BlockedSite[]>(blockedSitesRequest);
+        setBlockedSites(sites);
+      } catch {
+        // Keep popup resilient when extension is reloading.
       }
-    });
+    }
+
+    loadState();
   }, []);
 
-  const handleToggleBlocking = () => {
-    chrome.runtime.sendMessage(
-      { 
-        type: MessageType.TOGGLE_BLOCKING, 
-        data: { hostname, isIncognito } 
-      } as MessagePayload,
-      (response) => {
-        setIsBlocked(response.isBlocked);
-        setBlockedCount(response.blockedCount);
+  const handleToggleBlocking = async (): Promise<void> => {
+    if (!hostname) {
+      return;
+    }
 
-        // Update the blockedSites list
-        if (response.isBlocked) {
-          // Add the site to the list if it's not already there
-          setBlockedSites(prevSites => {
-            if (!prevSites.some(site => site.hostname === hostname)) {
-              return [...prevSites, { 
-                hostname, 
-                isBlocked: true, 
-                blockedCount: response.blockedCount,
-                isMasked: isIncognito // Set isMasked based on isIncognito
-              }];
-            }
-            return prevSites;
-          });
-        } else {
-          // Remove the site from the list if it's unblocked
-          setBlockedSites(prevSites => prevSites.filter(site => site.hostname !== hostname));
-        }
+    const request: ToggleBlockingRequest = {
+      type: MessageType.TOGGLE_BLOCKING,
+      data: { hostname, isIncognito },
+    };
+
+    try {
+      const response = await sendMessage<ToggleBlockingRequest, ToggleBlockingResponse>(request);
+      setIsBlocked(response.isBlocked);
+      setBlockedCount(response.blockedCount);
+      setBlockedSites(response.blockedSites);
+    } catch {
+      // Ignore runtime failures and keep current UI state.
+    }
+  };
+
+  const handleUnblockSite = async (siteHostname: string): Promise<void> => {
+    const request: UnblockSiteRequest = {
+      type: MessageType.UNBLOCK_SITE,
+      data: { hostname: siteHostname },
+    };
+
+    try {
+      const response = await sendMessage<UnblockSiteRequest, UnblockSiteResponse>(request);
+      if (response.success) {
+        setBlockedSites((prevSites) => prevSites.filter((site) => site.hostname !== siteHostname));
       }
-    );
+    } catch {
+      // Ignore runtime failures and keep current UI state.
+    }
   };
 
-  const handleUnblockSite = (hostname: string) => {
-    chrome.runtime.sendMessage(
-      { type: MessageType.UNBLOCK_SITE, data: { hostname } } as MessagePayload,
-      (response) => {
-        if (response.success) {
-          setBlockedSites(prevSites => prevSites.filter(site => site.hostname !== hostname));
-        }
-      }
-    );
-  };
-
-  // Function to mask the hostname
-  const maskHostname = (hostname: string) => {
-    return hostname.replace(/[^.]/g, '*');
-  };
-
-  // Function to toggle unmasking for a specific site
-  const toggleUnmask = (hostname: string) => {
-    setUnmaskedSites(prevUnmasked => {
-      const newUnmasked = new Set(prevUnmasked);
-      if (newUnmasked.has(hostname)) {
-        newUnmasked.delete(hostname);
+  const toggleUnmask = (siteHostname: string): void => {
+    setUnmaskedSites((prevUnmasked) => {
+      const next = new Set(prevUnmasked);
+      if (next.has(siteHostname)) {
+        next.delete(siteHostname);
       } else {
-        newUnmasked.add(hostname);
+        next.add(siteHostname);
       }
-      return newUnmasked;
+      return next;
     });
   };
 
@@ -115,10 +133,7 @@ const Popup: React.FC = () => {
           <span className="info-value">{blockedCount}</span>
         </div>
       </div>
-      <button
-        className={`toggle-button ${isBlocked ? 'blocked' : 'allowed'}`}
-        onClick={handleToggleBlocking}
-      >
+      <button className={`toggle-button ${isBlocked ? 'blocked' : 'allowed'}`} onClick={handleToggleBlocking}>
         {isBlocked ? 'Disable Blocking' : 'Enable Blocking'}
       </button>
       <div className="blocked-sites-list">
@@ -127,20 +142,15 @@ const Popup: React.FC = () => {
           <p>No sites are currently blocked.</p>
         ) : (
           <ul>
-            {blockedSites.map(site => (
+            {blockedSites.map((site) => (
               <li key={site.hostname}>
-                {site.isMasked && !unmaskedSites.has(site.hostname) 
-                  ? maskHostname(site.hostname) 
-                  : site.hostname}
+                {site.isMasked && !unmaskedSites.has(site.hostname) ? maskHostname(site.hostname) : site.hostname}
                 {site.isMasked && (
-                  <button 
-                    onClick={() => toggleUnmask(site.hostname)}
-                    className="unmask-button"
-                  >
+                  <button onClick={() => toggleUnmask(site.hostname)} className="unmask-button">
                     {unmaskedSites.has(site.hostname) ? 'Mask' : 'Unmask'}
                   </button>
                 )}
-                <button onClick={() => handleUnblockSite(site.hostname)}>Unblock</button>
+                <button onClick={() => void handleUnblockSite(site.hostname)}>Unblock</button>
               </li>
             ))}
           </ul>
@@ -150,5 +160,7 @@ const Popup: React.FC = () => {
   );
 };
 
-const root = createRoot(document.getElementById('root')!);
-root.render(<Popup />);
+const rootElement = document.getElementById('root');
+if (rootElement) {
+  createRoot(rootElement).render(<Popup />);
+}
