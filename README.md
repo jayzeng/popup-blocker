@@ -20,6 +20,7 @@ The demo explains how popup interception works across service worker, content sc
 
 - Enable/disable blocking per site with one click
 - Tracks a count of blocked popups per site
+- Optional in-page blocked-count notifications (off by default)
 - Incognito mode support (masked hostnames in the UI)
 - Blocks multiple popup vectors: `window.open`, `showModalDialog`, `location.assign/replace/reload`, `<a target="_blank">` clicks, and form submissions targeting `_blank`
 - Re-applies blocking every 500 ms to defeat scripts that restore `window.open` after page load
@@ -97,6 +98,8 @@ The content script runs at `document_start` on every page (including iframes).
 
 **Background messages:** The content script also listens for `UPDATE_BLOCKING_STATUS` from the background to enable or disable blocking dynamically (e.g. when the user toggles via the popup while the page is open).
 
+**In-page notifications:** The blocked-count toast is disabled by default. The popup's "Show block notifications on pages" option persists `SHOW_BLOCKED_TOAST` in `chrome.storage.local`; content scripts listen for storage changes so the setting takes effect immediately.
+
 ### 3. Page Context Scripts (`block_popups.js` / `unblock_popups.js`)
 
 These run inside the page's own JavaScript scope, so they can override browser APIs that are inaccessible from the content script context.
@@ -123,6 +126,7 @@ The browser action popup shows:
 - The current tab's hostname
 - Whether the site is blocked (with a toggle button)
 - Total blocked popup count for the site
+- An option to show or hide in-page blocked-count notifications (hidden by default)
 - A list of all blocked sites with per-site Unblock buttons
 
 Incognito-mode sites have `isMasked: true`; their hostnames are displayed as `***.**` by default with a toggle button to temporarily reveal them.

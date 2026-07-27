@@ -8,6 +8,9 @@ const listeners = {
 };
 
 globalThis.chrome = {
+  extension: {
+    inIncognitoContext: false,
+  },
   runtime: {
     onMessage: {
       addListener: jest.fn((fn) => listeners.onMessage.push(fn)),

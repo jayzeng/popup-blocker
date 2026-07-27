@@ -19,11 +19,20 @@ body {
   text-align: center;
 }
 
-.global-row {
+.global-row,
+.setting-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 10px;
+}
+
+.setting-checkbox {
+  width: 18px;
+  height: 18px;
+  margin: 0 12px 0 0;
+  accent-color: #29a45a;
+  cursor: pointer;
 }
 
 .toggle-global-btn {
@@ -129,4 +138,94 @@ body {
 #emptyState {
   color: #666;
   margin: 0;
+}
+
+.coverage-status.whitelisted {
+  background: #e8f7ee;
+  color: #1a6b35;
+}
+
+.coverage-status.blacklisted {
+  background: #fdecea;
+  color: #a01010;
+}
+
+.toggle-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.list-section {
+  margin-top: 14px;
+}
+
+.list-section h2 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.list-section ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.list-section ul li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-bottom: 1px solid #eee;
+  padding: 6px 0;
+}
+
+.list-section p {
+  color: #666;
+  margin: 0;
+}
+
+.add-site-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.add-site-row input {
+  flex: 1;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 13px;
+}
+
+.add-site-row button {
+  border: 1px solid #ccc;
+  background: #fafafa;
+  border-radius: 4px;
+  font-size: 13px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.editable-hostname {
+  cursor: text;
+  border-radius: 3px;
+  padding: 1px 3px;
+  margin: -1px -3px;
+  transition: background 0.1s;
+}
+
+.editable-hostname:hover {
+  background: #f0f4ff;
+}
+
+.inline-edit-input {
+  flex: 1;
+  border: 1px solid #4a9eff;
+  border-radius: 3px;
+  padding: 2px 5px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  min-width: 0;
 }

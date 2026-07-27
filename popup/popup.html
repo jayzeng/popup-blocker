@@ -15,6 +15,11 @@
       <button id="toggleGlobal" class="toggle-global-btn global-on">ON</button>
     </div>
 
+    <div class="setting-row">
+      <label for="showBlockedToast" class="info-label">Show block notifications on pages:</label>
+      <input id="showBlockedToast" class="setting-checkbox" type="checkbox" />
+    </div>
+
     <div id="coverageStatus" class="coverage-status not-covered"></div>
 
     <div class="info-container">
@@ -34,6 +39,26 @@
       <h2 id="sitesListTitle">Blocked Sites</h2>
       <ul id="blockedSitesList"></ul>
       <p id="emptyState">No sites are currently blocked.</p>
+    </div>
+
+    <div class="list-section" id="whitelistSection">
+      <h2>Always Allowed (Whitelist)</h2>
+      <div class="add-site-row">
+        <input type="text" id="whitelistInput" placeholder="example.com" />
+        <button id="addWhitelistBtn">Add</button>
+      </div>
+      <ul id="whitelistSitesList"></ul>
+      <p id="whitelistEmpty">No sites whitelisted.</p>
+    </div>
+
+    <div class="list-section" id="blacklistSection">
+      <h2>Always Blocked (Blacklist)</h2>
+      <div class="add-site-row">
+        <input type="text" id="blacklistInput" placeholder="example.com" />
+        <button id="addBlacklistBtn">Add</button>
+      </div>
+      <ul id="blacklistSitesList"></ul>
+      <p id="blacklistEmpty">No sites blacklisted.</p>
     </div>
   </div>
 

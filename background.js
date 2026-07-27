@@ -1,6 +1,12 @@
 const STORAGE_KEY_BLOCKED_SITES = 'BLOCKED_SITES';
 const STORAGE_KEY_GLOBAL_ENABLED = 'GLOBAL_ENABLED';
 
+const DEFAULT_WHITELIST = [
+  'google.com', 'linkedin.com', 'microsoft.com', 'outlook.com',
+  'github.com', 'apple.com', 'youtube.com', 'amazon.com',
+  'dropbox.com', 'slack.com', 'zoom.us', 'notion.so',
+];
+
 let blockedSites = [];
 let globalBlockingEnabled = true;
 let storageReady = false;
@@ -27,6 +33,7 @@ function sanitizeBlockedSites(value) {
           : 0,
       isMasked: site.isMasked === true,
       allowedUntil: typeof site.allowedUntil === 'number' ? site.allowedUntil : null,
+      listType: site.listType === 'whitelist' || site.listType === 'blacklist' ? site.listType : null,
     }))
     .filter((site) => site.hostname.length > 0);
 }
@@ -38,6 +45,9 @@ function findBlockedSite(hostname) {
 
 function shouldBlock(hostname) {
   const site = findBlockedSite(hostname);
+  // Whitelist/blacklist override global toggle
+  if (site && site.listType === 'whitelist') return false;
+  if (site && site.listType === 'blacklist') return true;
   if (globalBlockingEnabled) {
     if (!site || site.isBlocked !== false) return true;
     // Temporary exception: check if it has expired
@@ -53,7 +63,7 @@ function cleanExpiredExceptions() {
   const now = Date.now();
   const before = blockedSites.length;
   blockedSites = blockedSites.filter(
-    (site) => !(site.isBlocked === false && site.allowedUntil !== null && now > site.allowedUntil)
+    (site) => !(site.listType === null && site.isBlocked === false && site.allowedUntil !== null && now > site.allowedUntil)
   );
   if (blockedSites.length !== before) saveBlockedSites();
 }
@@ -143,6 +153,10 @@ function isValidMessage(message) {
       return true;
     case 'SET_GLOBAL_BLOCKING':
       return data && typeof data.enabled === 'boolean';
+    case 'ADD_TO_LIST':
+      return data && typeof data.hostname === 'string' && (data.listType === 'whitelist' || data.listType === 'blacklist');
+    case 'RENAME_SITE':
+      return data && typeof data.oldHostname === 'string' && typeof data.newHostname === 'string';
     default:
       return false;
   }
@@ -151,7 +165,7 @@ function isValidMessage(message) {
 function ensureSiteEntry(hostname, isMasked) {
   let site = findBlockedSite(hostname);
   if (!site) {
-    site = { hostname, isBlocked: true, blockedCount: 0, isMasked: !!isMasked, allowedUntil: null };
+    site = { hostname, isBlocked: true, blockedCount: 0, isMasked: !!isMasked, allowedUntil: null, listType: null };
     blockedSites.push(site);
   }
   return site;
@@ -164,13 +178,25 @@ setInterval(cleanExpiredExceptions, 60 * 1000);
 
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === 'install') {
-    chrome.storage.local.get([STORAGE_KEY_GLOBAL_ENABLED], (result) => {
+    chrome.storage.local.get([STORAGE_KEY_GLOBAL_ENABLED, STORAGE_KEY_BLOCKED_SITES], (result) => {
+      const updates = {};
       if (result[STORAGE_KEY_GLOBAL_ENABLED] === undefined) {
-        chrome.storage.local.set({ [STORAGE_KEY_GLOBAL_ENABLED]: true });
+        updates[STORAGE_KEY_GLOBAL_ENABLED] = true;
+      }
+      if (!Array.isArray(result[STORAGE_KEY_BLOCKED_SITES]) || result[STORAGE_KEY_BLOCKED_SITES].length === 0) {
+        updates[STORAGE_KEY_BLOCKED_SITES] = DEFAULT_WHITELIST.map((h) => ({
+          hostname: h, isBlocked: false, blockedCount: 0, isMasked: false, allowedUntil: null, listType: 'whitelist',
+        }));
+      }
+      if (Object.keys(updates).length > 0) {
+        chrome.storage.local.set(updates, initializeState);
+      } else {
+        initializeState();
       }
     });
+  } else {
+    initializeState();
   }
-  initializeState();
 });
 
 chrome.runtime.onStartup.addListener(initializeState);
@@ -205,11 +231,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const allowedUntil = message.data.allowedUntil !== undefined ? message.data.allowedUntil : null;
       const existing = findBlockedSite(hostname);
 
+      // Whitelist/blacklist sites cannot be toggled via this handler
+      if (existing && existing.listType !== null) {
+        sendResponse({ isBlocked: shouldBlock(hostname), blockedCount: existing.blockedCount, blockedSites, globalBlockingEnabled });
+        return;
+      }
+
       if (globalBlockingEnabled) {
         if (!existing || existing.isBlocked !== false || (existing.allowedUntil !== null && Date.now() > existing.allowedUntil)) {
           // Add/update exception: allow this site
           if (!existing) {
-            blockedSites.push({ hostname, isBlocked: false, blockedCount: 0, isMasked: message.data.isIncognito, allowedUntil });
+            blockedSites.push({ hostname, isBlocked: false, blockedCount: 0, isMasked: message.data.isIncognito, allowedUntil, listType: null });
           } else {
             existing.isBlocked = false;
             existing.allowedUntil = allowedUntil;
@@ -230,7 +262,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       // Global OFF: original opt-in per-site behavior
       if (!existing) {
-        blockedSites.push({ hostname, isBlocked: true, blockedCount: 0, isMasked: message.data.isIncognito, allowedUntil: null });
+        blockedSites.push({ hostname, isBlocked: true, blockedCount: 0, isMasked: message.data.isIncognito, allowedUntil: null, listType: null });
         saveBlockedSites();
         sendActiveTabStatusUpdate({ isBlocked: true, blockedCount: 0, globalBlockingEnabled });
         sendResponse({ isBlocked: true, blockedCount: 0, blockedSites, globalBlockingEnabled });
@@ -252,6 +284,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         isBlocked,
         blockedCount: site ? site.blockedCount : 0,
         globalBlockingEnabled,
+        listType: site ? site.listType : null,
       });
       return;
     }
@@ -280,6 +313,35 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     if (message.type === 'GET_BLOCKED_SITES') {
       sendResponse(blockedSites);
+      return;
+    }
+
+    if (message.type === 'ADD_TO_LIST') {
+      const hostname = normalizeHostname(message.data.hostname);
+      const listType = message.data.listType;
+      const existing = findBlockedSite(hostname);
+      if (existing) {
+        existing.listType = listType;
+        existing.isBlocked = listType === 'blacklist';
+        existing.allowedUntil = null;
+      } else {
+        blockedSites.push({ hostname, isBlocked: listType === 'blacklist', blockedCount: 0, isMasked: false, allowedUntil: null, listType });
+      }
+      saveBlockedSites();
+      sendActiveTabStatusUpdate({ isBlocked: shouldBlock(hostname), globalBlockingEnabled });
+      sendResponse({ success: true });
+      return;
+    }
+
+    if (message.type === 'RENAME_SITE') {
+      const oldH = normalizeHostname(message.data.oldHostname);
+      const newH = normalizeHostname(message.data.newHostname);
+      const site = findBlockedSite(oldH);
+      if (!site) { sendResponse({ success: false, error: 'not found' }); return; }
+      if (oldH !== newH && findBlockedSite(newH)) { sendResponse({ success: false, error: 'conflict' }); return; }
+      site.hostname = newH;
+      saveBlockedSites();
+      sendResponse({ success: true });
       return;
     }
 

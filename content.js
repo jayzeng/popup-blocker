@@ -142,10 +142,23 @@ chrome.runtime.sendMessage(
 );
 
 // ---- Blocked popup indicator ----
+const STORAGE_KEY_SHOW_BLOCKED_TOAST = 'SHOW_BLOCKED_TOAST';
 let localCount = 0;
+let showBlockedToast = false;
 let toastHost = null;
 let toastRefs = null;
 let autoHideTimer = null;
+
+chrome.storage.local.get([STORAGE_KEY_SHOW_BLOCKED_TOAST], (result) => {
+  showBlockedToast = result[STORAGE_KEY_SHOW_BLOCKED_TOAST] === true;
+});
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'local' || !changes[STORAGE_KEY_SHOW_BLOCKED_TOAST]) return;
+
+  showBlockedToast = changes[STORAGE_KEY_SHOW_BLOCKED_TOAST].newValue === true;
+  if (!showBlockedToast) hideToast();
+});
 
 const DURATIONS = [
   { label: '5 min', ms: 5 * 60 * 1000 },
@@ -371,6 +384,7 @@ function buildToast() {
 }
 
 function showToast(count) {
+  if (!showBlockedToast) return;
   if (!toastHost) buildToast();
   if (!toastRefs) return;
 

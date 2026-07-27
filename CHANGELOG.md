@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Popup option to show in-page blocked-count notifications; notifications are hidden by default
+- Whitelist ("Always Allowed") and Blacklist ("Always Blocked") lists in the popup — entries override the global toggle
+- Default whitelist pre-populated on first install with 12 well-known trusted domains (Google, GitHub, LinkedIn, etc.)
+- Popup shows dedicated sections for whitelist and blacklist with Add/Remove controls; Enter key also submits
+- Coverage status banner shows "always allowed (whitelist)" or "always blocked (blacklist)" for listed sites
+- Per-site toggle button is disabled for whitelist/blacklist sites (since those lists take precedence)
+
+
 - In-page toast indicator with animated count badge — appears whenever a popup is blocked, showing total blocked count with a bump animation on each increment; auto-dismisses after 5 s
 - "Allow site" button in the toast expands to a duration picker: **5 min**, **1 hr**, or **Forever** — each adds a timed or permanent exception without opening the popup
 - Timed exceptions expire automatically; background cleans them on startup and every 60 s; `shouldBlock` checks expiry lazily
