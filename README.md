@@ -7,6 +7,7 @@ No build step — plain JS files loaded directly as an unpacked extension.
 ---
 
 ## Demo
+<img width="1459" height="919" alt="image" src="https://github.com/user-attachments/assets/bb326822-f43e-4ea4-b4c8-d98354f1fbf3" />
 
 Live demo and documentation site:
 
